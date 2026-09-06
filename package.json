@@ -6,7 +6,8 @@
   "scripts": {
     "vendor": "node scripts/vendor.cjs",
     "test": "node --test tests/core.test.cjs",
-    "test:browser": "node tests/browser.cjs"
+    "test:browser": "node tests/browser.cjs",
+    "test:payments": "node tests/payments.cjs"
   },
   "dependencies": {
     "chart.js": "4.5.0",

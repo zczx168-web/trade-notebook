@@ -13,6 +13,7 @@ const localDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() 
 let trades = [], profile = { name: '我的交易账本' }, demo = true, storageBroken = false;
 let currentView = 'overview', page = 1, profitChartInstance, errorChartInstance, toastTimer;
 let session = null, payPollTimer, pollGeneration = 0, authBusy = false, authMode = 'login', codeDeadline = 0;
+let manualPlan = null, supportReturn = 'plans';
 const titles = { overview: ['复盘总览', '把每一次交易，变成下一次进步。'], trades: ['交易记录', '记录决策的依据，也记录真实的结果。'], review: ['错误分析', '找到重复的偏差，让下一笔更有纪律。'], settings: ['账本设置', '管理你的交易账本与数据备份。'] };
 function icons() { if (window.lucide) lucide.createIcons(); }
 function toast(message) { clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false; toastTimer = setTimeout(() => $('toast').hidden = true, 4500); }
@@ -144,7 +145,55 @@ function apiBase() { const raw = window.TRADE_CONFIG?.apiBase; if (!raw) return 
 async function request(path, body) { const base = apiBase(); if (!base) throw new Error('服务尚未接通'); const res = await fetch(base + path, { method: body ? 'POST' : 'GET', credentials: 'include', headers: body ? { 'Content-Type': 'application/json', 'X-CSRF-Token': session?.csrfToken || '' } : {}, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15000) }); if (!res.ok) throw new Error(res.status === 401 ? '请先登录账号' : '服务暂时不可用，请稍后重试'); return res.json(); }
 async function refreshSession() { if (!apiBase()) return; session = await request('/me'); if (!session || typeof session !== 'object') throw new Error('账号服务返回异常'); updateMembership(); renderProfile(); }
 function updateMembership() { const m = session?.membership; const text = m?.type === 'forever' ? '永久会员' : m?.type === 'month' && Number.isFinite(Date.parse(m.expiresAt)) && Date.parse(m.expiresAt) > Date.now() ? `月度会员 · 至 ${m.expiresAt.slice(0, 10)}` : '普通版'; $('memberStatus').textContent = text; $('settingsMembership').textContent = text; $('accountStatus').textContent = session?.user ? `已登录 ${session.user.phone} · 交易记录仍保存在当前浏览器` : apiBase() ? '尚未登录' : '账号服务暂未接通'; $('logoutButton').hidden = !session?.user; }
-function openVip() { const available = !!apiBase(); $('paymentNotice').textContent = available ? '付款结果以支付服务确认的订单状态为准。' : '支付服务暂未接通，当前不可购买。'; document.querySelectorAll('.pay-wechat,.pay-alipay').forEach(b => b.disabled = !available); $('vipModal').showModal(); }
+function openVip() {
+  const available = !!apiBase(), manual = !!window.TRADE_CONFIG?.manualPayment;
+  $('paymentNotice').textContent = manual ? '微信扫码收款 · 客服人工核验，不会自动开通。' : available ? '付款结果以支付服务确认的订单状态为准。' : '支付服务暂未接通，当前不可购买。';
+  document.querySelectorAll('.pay-wechat,.pay-alipay').forEach(b => { b.disabled = !available; b.hidden = !available; });
+  document.querySelectorAll('.pay-manual').forEach(b => b.hidden = !window.TRADE_CONFIG?.manualPayment?.plans?.[b.dataset.goods]);
+  $('vipSupport').hidden = !manual;
+  if (!$('vipModal').open) $('vipModal').showModal();
+}
+function setQrImage(imageId, errorId, path) {
+  const image = $(imageId);
+  $(errorId).hidden = true;
+  image.onload = () => { $(errorId).hidden = true; };
+  image.onerror = () => { $(errorId).hidden = false; };
+  image.src = path;
+}
+function openManualPayment(goodsType) {
+  const config = window.TRADE_CONFIG?.manualPayment, plan = config?.plans?.[goodsType];
+  if (!plan) return toast('该收款方式暂不可用');
+  manualPlan = goodsType;
+  $('manualPayTitle').textContent = `${plan.name} · ¥${plan.price}`;
+  $('manualPlanName').textContent = plan.name;
+  $('manualAmount').textContent = '¥' + plan.price;
+  $('manualDuration').textContent = plan.duration;
+  $('manualMerchant').textContent = config.merchant;
+  $('manualPayQr').alt = `${plan.name} ¥${plan.price} 微信收款二维码`;
+  setQrImage('manualPayQr', 'manualQrError', plan.qr);
+  $('savePaymentQr').href = plan.original;
+  $('savePaymentQr').download = `交易纠错本-${plan.name}-${plan.price}元-微信收款码.jpg`;
+  $('originalPaymentQr').href = plan.original;
+  $('vipModal').close();
+  if (!$('manualPayDialog').open) $('manualPayDialog').showModal();
+  $('manualPayDialog').scrollTop = 0;
+}
+function openSupport(from = 'plans') {
+  const config = window.TRADE_CONFIG?.manualPayment;
+  if (!config) return toast('客服入口暂不可用');
+  supportReturn = from;
+  const plan = from === 'payment' ? config.plans[manualPlan] : null;
+  $('supportName').textContent = config.supportName;
+  $('supportPlan').textContent = plan ? `${plan.name} · ¥${plan.price} · ${plan.duration}` : '会员咨询与付款核验';
+  setQrImage('supportQr', 'supportQrError', config.supportQr);
+  $('saveSupportQr').href = config.supportOriginal;
+  $('saveSupportQr').download = '交易纠错本-客服微信二维码.jpg';
+  $('originalSupportQr').href = config.supportOriginal;
+  $('backFromSupport').querySelector('span').textContent = from === 'payment' ? '返回收款码' : '返回会员中心';
+  $('manualPayDialog').close(); $('vipModal').close();
+  if (!$('supportDialog').open) $('supportDialog').showModal();
+  $('supportDialog').scrollTop = 0;
+}
 function stopPoll() { clearTimeout(payPollTimer); pollGeneration++; }
 function pendingOrder() { try { return sessionStorage.getItem(PENDING_KEY); } catch { return null; } }
 async function createPayOrder(goodsType, payType) {
@@ -206,7 +255,7 @@ document.addEventListener('click', e => {
   if (b.dataset.delete) { const t = trades.find(t => t.id === b.dataset.delete); if (t) confirmAction('删除这笔交易？', `${t.date} · ${t.symbol} · 净盈亏 ¥${money(t.pnl)}。删除后无法撤销。`, () => { saveTrades(trades.filter(x => x.id !== t.id)); render(); toast('交易已删除'); }); }
   if (b.dataset.close) $(b.dataset.close).close();
   if (b.dataset.auth) openAuth(b.dataset.auth);
-  if (b.dataset.policy) { const privacy = b.dataset.policy === 'privacy'; $('policyTitle').textContent = privacy ? '隐私说明' : '用户协议'; $('policyText').textContent = privacy ? '当前静态版的交易与笔记仅保存在本浏览器，不会主动上传到 GitHub 或其他服务器。GitHub Pages 作为托管服务可能处理网络访问日志。清除网站数据会移除账本；请定期导出备份。账号与支付仅在运营方接入相应服务后可用，届时应提供服务商、运营主体和个人信息处理规则。当前未接通账号服务时，不会发送手机号或密码。' : '本工具用于记录与复盘，不提供交易执行或投资建议。用户应核对输入数据和计算结果，并自行备份。当前网站为本地账本版本，账号与支付尚未启用；正式销售前应由运营方补全会员权益、服务条款、联系方式及退款规则。'; $('policyDialog').showModal(); }
+  if (b.dataset.policy) { const privacy = b.dataset.policy === 'privacy'; $('policyTitle').textContent = privacy ? '隐私说明' : '用户协议'; $('policyText').textContent = privacy ? '当前静态版的交易与笔记仅保存在本浏览器，不会主动上传到 GitHub 或其他服务器。GitHub Pages 作为托管服务可能处理网络访问日志。清除网站数据会移除账本；请定期导出备份。微信收款码和客服码由运营方提供，实际付款在微信中完成。本站不读取付款结果，也不收集付款凭证；通过微信发送给客服的信息由你自行选择。当前未接通账号服务，不会发送手机号或密码。' : '本工具用于记录与复盘，不提供交易执行或投资建议。用户应核对输入数据和计算结果，并自行备份。当前为本地账本版本，交易记录、统计和备份均可使用。微信收款采用客服人工核验，付款不会自动开通或同步本站会员状态。付款前请与客服确认会员权益、开通安排及退款规则。'; $('policyDialog').showModal(); }
 });
 $('tradeForm').onsubmit = e => { e.preventDefault(); try { const t = C.validateTrade(readForm()); const next = [...trades]; const i = next.findIndex(x => x.id === t.id); if (i >= 0) next[i] = t; else next.push(t); saveTrades(next); demo = false; $('tradeDialog').close(); render(); toast(i >= 0 ? '交易已更新' : '交易已保存到我的账本'); } catch (error) { $('tradeError').textContent = error.message; } };
 $('tradeMode').onchange = tradeMode; $('tradeDirection').onchange = tradeMode; $('contractFields').oninput = tradeMode;
@@ -219,6 +268,11 @@ $('backupButton').onclick = () => { try { download(storageBroken ? localStorage.
 $('importButton').onclick = () => $('importFile').click();
 $('importFile').onchange = async e => { const file = e.target.files[0]; if (!file) return; try { if (file.size > 20000000) throw new Error('备份文件不能超过 20 MB'); const next = C.validateBackup(JSON.parse(await file.text())); confirmAction('恢复账本备份？', `备份包含 ${next.length} 笔交易，将替换我的账本现有的 ${trades.length} 笔记录。请确认已导出当前备份。`, () => { write(STORAGE_KEY, { version: 1, trades: next }); storageBroken = false; trades = next; demo = false; render(); toast('备份已恢复'); }); } catch (error) { toast(error instanceof SyntaxError ? 'JSON 文件格式不正确' : error.message); } finally { e.target.value = ''; } };
 $('openVipModal').onclick = openVip; $('settingsVip').onclick = openVip; $('closeVipModal').onclick = () => $('vipModal').close(); $('vipModal').addEventListener('close', stopPoll);
+document.querySelectorAll('.pay-manual').forEach(b => b.onclick = () => openManualPayment(b.dataset.goods));
+$('vipSupport').onclick = () => openSupport('plans');
+$('paymentSupport').onclick = () => openSupport('payment');
+$('backToPlans').onclick = () => { $('manualPayDialog').close(); openVip(); };
+$('backFromSupport').onclick = () => { $('supportDialog').close(); if (supportReturn === 'payment') openManualPayment(manualPlan); else openVip(); };
 document.querySelectorAll('.pay-wechat').forEach(b => b.onclick = () => createPayOrder(b.dataset.goods, 'wx')); document.querySelectorAll('.pay-alipay').forEach(b => b.onclick = () => createPayOrder(b.dataset.goods, 'alipay'));
 $('resumePay').onclick = () => { const no = pendingOrder(); if (no) startOrderPoll(no); };
 $('accountButton').onclick = () => openAuth();

@@ -39,7 +39,7 @@ const url = process.env.TEST_URL || pathToFileURL(path.join(root, 'site/index.ht
     await page.locator('[data-view=settings]').click();
     const backupEvent = page.waitForEvent('download'); await page.locator('#backupButton').click(); await (await backupEvent).saveAs(path.join(output, 'backup.json'));
     assert.equal(JSON.parse(fs.readFileSync(path.join(output, 'backup.json'), 'utf8')).trades.length, 1);
-    await page.locator('#settingsVip').click(); await expect(page.locator('#paymentNotice')).toContainText('暂未接通'); await expect(page.locator('.pay-wechat').first()).toBeDisabled(); await page.locator('#closeVipModal').click();
+    await page.locator('#settingsVip').click(); await expect(page.locator('#paymentNotice')).toContainText('人工核验'); await expect(page.locator('.pay-manual').first()).toBeEnabled(); await expect(page.locator('.pay-wechat').first()).toBeHidden(); await page.locator('#closeVipModal').click();
     await page.locator('#accountButton').click(); await expect(page.locator('#authSubmit')).toBeDisabled(); await page.locator('[data-auth=register]').click(); await expect(page.locator('#authPassword')).toBeVisible(); await page.locator('[data-close=authDialog]').click();
     await page.locator('[data-view=trades]').click(); await page.locator('[data-delete]').filter({ visible: true }).first().click(); await page.locator('#confirmAction').click(); await expect(page.locator('#allTable')).toContainText('还没有交易记录');
     await page.locator('[data-view=settings]').click(); await page.locator('#importFile').setInputFiles(path.join(output, 'backup.json')); await expect(page.locator('#confirmText')).toContainText('1 笔'); await page.locator('#confirmAction').click();

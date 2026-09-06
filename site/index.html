@@ -7,11 +7,12 @@
   <meta name="description" content="交易纠错本：记录每一笔交易，复盘交易错误，跟踪盈亏与执行纪律。">
   <title>交易纠错本 · 复盘工作台</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="payments.css?v=20260906">
   <script defer src="vendor/lucide.js"></script>
   <script defer src="vendor/chart.umd.js"></script>
-  <script defer src="config.js"></script>
+  <script defer src="config.js?v=20260906"></script>
   <script defer src="core.js"></script>
-  <script defer src="app.js"></script>
+  <script defer src="app.js?v=20260906"></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -52,7 +53,31 @@
     </main>
   </div>
   <dialog id="tradeDialog"><form id="tradeForm"><div class="dialog-heading"><div><span class="eyebrow">TRADE JOURNAL</span><h2 id="tradeDialogTitle">记录一笔交易</h2></div><button type="button" class="icon-button" data-close="tradeDialog" aria-label="关闭"><i data-lucide="x"></i></button></div><input id="tradeId" type="hidden"><div class="form-grid"><label>交易日期<input type="date" id="tradeDate" required></label><label>交易品种<input id="tradeSymbol" placeholder="例如：螺纹钢 RB2610" maxlength="24" required></label><label>市场<select id="tradeMarket"><option>期货</option><option>股票</option><option>外汇</option><option>其他</option></select></label><label>方向<select id="tradeDirection"><option value="多">做多</option><option value="空">做空</option></select></label><label class="full">净盈亏（元，亏损填负数）<input id="tradePnl" type="number" step="0.01" min="-1000000000" max="1000000000" placeholder="0.00" required></label><fieldset class="full"><legend>错误标签</legend><div id="errorChoices" class="error-choices"></div></fieldset><label class="full">复盘笔记<textarea id="tradeNote" rows="4" maxlength="2000" placeholder="入场依据、执行偏差，以及下一次的改进…"></textarea></label></div><p class="form-error" id="tradeError" role="alert"></p><div class="dialog-actions"><button type="button" class="secondary" data-close="tradeDialog">取消</button><button type="submit" class="primary"><i data-lucide="check"></i>保存交易</button></div></form></dialog>
-  <dialog id="vipModal" class="vip-dialog"><div class="dialog-heading"><div><span class="eyebrow">MEMBERSHIP</span><h2>会员中心</h2></div><button class="icon-button" id="closeVipModal" aria-label="关闭"><i data-lucide="x"></i></button></div><div class="payment-notice"><i data-lucide="info"></i><span id="paymentNotice">支付服务暂未接通，当前不可购买。</span></div><div class="plans"><article class="plan"><i data-lucide="calendar-days"></i><h3>月度会员</h3><div class="plan-price">¥19.90<span>/ 30 天</span></div><p>会员有效期 30 天</p><button class="pay-wechat secondary" data-goods="month"><i data-lucide="qr-code"></i>微信支付</button><button class="pay-alipay secondary" data-goods="month"><i data-lucide="wallet"></i>支付宝</button></article><article class="plan forever"><i data-lucide="crown"></i><h3>永久会员</h3><div class="plan-price">¥199<span>/ 永久</span></div><p>一次开通，长期有效</p><button class="pay-wechat primary" data-goods="forever"><i data-lucide="qr-code"></i>微信支付</button><button class="pay-alipay secondary" data-goods="forever"><i data-lucide="wallet"></i>支付宝</button></article></div><p class="membership-footnote">交易记录、统计与备份当前均可使用。</p><div id="orderStatus" class="order-status" role="status"></div><button id="resumePay" class="secondary" hidden>查询未完成订单</button></dialog>
+  <dialog id="vipModal" class="vip-dialog" aria-labelledby="vipTitle">
+    <div class="dialog-heading"><div><span class="eyebrow">MEMBERSHIP</span><h2 id="vipTitle">会员中心</h2></div><button class="icon-button" id="closeVipModal" aria-label="关闭会员中心"><i data-lucide="x"></i></button></div>
+    <div class="payment-notice"><i data-lucide="info"></i><span id="paymentNotice">微信扫码收款 · 客服人工核验，不会自动开通。</span></div>
+    <div class="plans">
+      <article class="plan"><i data-lucide="calendar-days"></i><h3>月度会员</h3><div class="plan-price">¥19.90<span>/ 30 天</span></div><p>会员有效期 30 天</p><button class="pay-manual secondary" data-goods="month"><i data-lucide="qr-code"></i>微信扫码</button><button class="pay-wechat secondary" data-goods="month" hidden><i data-lucide="wallet"></i>微信在线支付</button><button class="pay-alipay secondary" data-goods="month" hidden><i data-lucide="wallet"></i>支付宝</button></article>
+      <article class="plan forever"><i data-lucide="crown"></i><h3>永久会员</h3><div class="plan-price">¥199<span>/ 永久</span></div><p>会员长期有效</p><button class="pay-manual primary" data-goods="forever"><i data-lucide="qr-code"></i>微信扫码</button><button class="pay-wechat secondary" data-goods="forever" hidden><i data-lucide="wallet"></i>微信在线支付</button><button class="pay-alipay secondary" data-goods="forever" hidden><i data-lucide="wallet"></i>支付宝</button></article>
+    </div>
+    <div class="membership-help"><div><p>交易记录、统计与备份当前均可使用。</p><p>付款前请向客服确认会员权益及开通安排。</p></div><button id="vipSupport" class="text-button"><i data-lucide="messages-square"></i>联系客服</button></div>
+    <div id="orderStatus" class="order-status" role="status"></div><button id="resumePay" class="secondary" hidden>查询未完成订单</button>
+  </dialog>
+  <dialog id="manualPayDialog" class="manual-pay-dialog" aria-labelledby="manualPayTitle">
+    <div class="dialog-heading"><div><span class="eyebrow">WECHAT PAYMENT</span><h2 id="manualPayTitle">微信扫码付款</h2></div><button class="icon-button" data-close="manualPayDialog" aria-label="关闭扫码付款"><i data-lucide="x"></i></button></div>
+    <div class="manual-pay-body">
+      <div class="qr-column"><img id="manualPayQr" class="payment-qr" width="580" height="580" alt="会员微信收款二维码"><p class="qr-load-error" id="manualQrError" role="alert" hidden>二维码加载失败，请查看原图或稍后重试。</p><div class="qr-tools"><a id="savePaymentQr" class="secondary" download target="_blank" rel="noopener noreferrer"><i data-lucide="download"></i>保存收款码</a><a id="originalPaymentQr" class="icon-button" target="_blank" rel="noopener noreferrer" title="查看收款码原图" aria-label="查看收款码原图"><i data-lucide="maximize-2"></i></a></div></div>
+      <div class="payment-details"><span class="manual-badge"><i data-lucide="scan-line"></i>微信收款 · 人工核验</span><h3 id="manualPlanName"></h3><div class="manual-amount" id="manualAmount"></div><dl><div><dt>会员期限</dt><dd id="manualDuration"></dd></div><div><dt>收款方</dt><dd id="manualMerchant"></dd></div></dl><p class="manual-payment-note">请核对微信中的收款方和金额。付款后，将付款凭证及会员类型发送给客服核账。</p><p class="manual-status-note">本站不会自动确认到账或更新会员状态，开通安排请与客服确认。</p><button id="paymentSupport" class="primary"><i data-lucide="messages-square"></i>联系客服核账</button><button id="backToPlans" class="text-button"><i data-lucide="arrow-left"></i>返回会员中心</button></div>
+    </div>
+  </dialog>
+  <dialog id="supportDialog" class="support-dialog" aria-labelledby="supportTitle">
+    <div class="dialog-heading"><div><span class="eyebrow">CUSTOMER SUPPORT</span><h2 id="supportTitle">客服核账</h2></div><button class="icon-button" data-close="supportDialog" aria-label="关闭客服二维码"><i data-lucide="x"></i></button></div>
+    <div class="support-profile"><span class="manual-badge"><i data-lucide="messages-square"></i>微信客服</span><h3 id="supportName"></h3><p id="supportPlan"></p></div>
+    <img id="supportQr" class="payment-qr" width="640" height="640" alt="焦煤观察客服微信二维码"><p class="qr-load-error" id="supportQrError" role="alert" hidden>客服二维码加载失败，请查看原图或稍后重试。</p>
+    <p class="support-note">会员权益、付款核验及开通安排，请联系此客服确认。本站未提交付款凭证，也不会自动开通会员。</p>
+    <div class="qr-tools"><a id="saveSupportQr" class="secondary" download target="_blank" rel="noopener noreferrer"><i data-lucide="download"></i>保存客服码</a><a id="originalSupportQr" class="icon-button" target="_blank" rel="noopener noreferrer" title="查看客服码原图" aria-label="查看客服码原图"><i data-lucide="maximize-2"></i></a></div>
+    <button id="backFromSupport" class="text-button"><i data-lucide="arrow-left"></i><span>返回会员中心</span></button>
+  </dialog>
   <dialog id="confirmDialog" class="confirm-dialog"><div class="dialog-heading"><h2 id="confirmTitle">确认操作</h2><button class="icon-button" data-close="confirmDialog" aria-label="关闭"><i data-lucide="x"></i></button></div><p id="confirmText"></p><div class="dialog-actions"><button class="secondary" data-close="confirmDialog">取消</button><button class="primary" id="confirmAction">确认</button></div></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
 </body>
