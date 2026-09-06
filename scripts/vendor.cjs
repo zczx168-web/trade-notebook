@@ -8,5 +8,7 @@ for (const [from, to] of [
   ['chart.js/LICENSE.md', 'chart.LICENSE.md'],
   ['lucide/dist/umd/lucide.js', 'lucide.js'],
   ['lucide/LICENSE', 'lucide.LICENSE'],
+  ['decimal.js/decimal.js', 'decimal.js'],
+  ['decimal.js/LICENCE.md', 'decimal.LICENSE.md'],
 ]) fs.copyFileSync(path.join(root, 'node_modules', from), path.join(dest, to));
 console.log('Local browser dependencies copied.');

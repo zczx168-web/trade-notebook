@@ -3,19 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#166b50">
   <meta name="description" content="交易纠错本：记录每一笔交易，复盘交易错误，跟踪盈亏与执行纪律。">
   <title>交易纠错本 · 复盘工作台</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="payments.css?v=20260906-activation1">
   <link rel="stylesheet" href="membership.css?v=20260906-trial1">
+  <link rel="stylesheet" href="enhancements.css?v=20260906-upgrade1">
+  <script defer src="vendor/decimal.js"></script>
   <script defer src="vendor/lucide.js"></script>
   <script defer src="vendor/chart.umd.js"></script>
   <script defer src="config.js?v=20260906"></script>
-  <script defer src="core.js"></script>
+  <script defer src="core.js?v=20260906-upgrade1"></script>
+  <script defer src="vault.js?v=20260906-upgrade1"></script>
   <script defer src="license-key.js?v=20260906-activation1"></script>
   <script defer src="license-core.js?v=20260906-activation1"></script>
-  <script defer src="app.js?v=20260906-trial1"></script>
+  <script defer src="workflows.js?v=20260906-upgrade1"></script>
+  <script defer src="app.js?v=20260906-upgrade1"></script>
 </head>
 <body>
   <aside class="sidebar">

@@ -1,10 +1,12 @@
 $ErrorActionPreference = 'Stop'
+if (-not $env:TRADE_LICENSE_HOME) { & (Join-Path $PSScriptRoot 'harden-issuer.ps1') | Out-Null }
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $dataDirectory = if ($env:TRADE_LICENSE_HOME) { $env:TRADE_LICENSE_HOME } else { Join-Path $env:LOCALAPPDATA 'TradeNotebookIssuer' }
 $runtimeFile = Join-Path $dataDirectory 'issuer-runtime.json'
 $running = $false
 if (Test-Path -LiteralPath $runtimeFile) {
     $runtime = Get-Content -LiteralPath $runtimeFile -Raw | ConvertFrom-Json
+    if ($runtime.url -notmatch '^http://127\.0\.0\.1:\d{1,5}/start/[a-f0-9]{64}$') { throw 'Invalid local issuer address.' }
     try {
         $response = Invoke-WebRequest -Uri $runtime.url -UseBasicParsing -TimeoutSec 3
         $running = $response.StatusCode -eq 200

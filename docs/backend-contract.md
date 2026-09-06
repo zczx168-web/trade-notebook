@@ -6,6 +6,8 @@
 
 ## 公开配置
 
+当前网页 CSP 使用 `connect-src 'none'` 禁止外部请求。部署真实后端前，必须将该指令改为明确的可信 API 域名，并重新测试，不要用通配符放开所有外连。
+
 ```javascript
 window.TRADE_CONFIG = Object.freeze({
   apiBase: 'https://api.your-domain.example',

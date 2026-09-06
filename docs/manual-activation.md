@@ -29,6 +29,8 @@
 
 此电脑的资料目录为 `C:/Users/z1384/AppData/Local/TradeNotebookIssuer/`，一般路径为 `%LOCALAPPDATA%/TradeNotebookIssuer/`。
 
+启动器会限制该目录及签发文件为当前 Windows 用户与 SYSTEM 可访问。开通工具 30 分钟无活动后需要重新打开启动器。此权限保护不等于文件加密，也不能防御同一账户下运行的恶意软件；请结合系统登录保护和离线备份。
+
 - `issuer.private.pem`：唯一签发私钥。务必离线备份，不能发送给客户、上传 GitHub 或公开。丢失后无法继续签发与当前网站公钥匹配的激活码。
 - `issuer-state.json`：真实交易单号、设备编号、有效期和激活码记录。首次签发后生成，应与私钥一起定期备份。
 - `issuer-runtime.json`：本机运行信息及启动凭据，无需迁移或公开。

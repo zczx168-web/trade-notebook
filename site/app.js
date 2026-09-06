@@ -22,17 +22,13 @@ const titles = { overview: ['复盘总览', '把每一次交易，变成下一�
 function icons() { if (window.lucide) lucide.createIcons(); }
 function toast(message) { clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false; toastTimer = setTimeout(() => $('toast').hidden = true, 4500); }
 function write(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { throw new Error('本地保存失败，浏览器存储不可用或空间已满。请先导出备份。'); } }
-function saveTrades(next) {
+function saveTrades(next, options = {}) {
   if (storageBroken) throw new Error('已存数据无法读取，请先在设置中导出原始数据并恢复有效备份。');
-  write(STORAGE_KEY, { version: 1, trades: next });
-  trades = next;
+  applyBook(V.commit(localStorage, Object.hasOwn(options, 'expectedRaw') ? options.expectedRaw : bookState.raw, { version: 2, trades: next, profile }, options));
 }
 function load() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) trades = C.validateBackup(JSON.parse(raw));
-    const rawProfile = localStorage.getItem(PROFILE_KEY);
-    if (rawProfile) { const p = JSON.parse(rawProfile); if (typeof p.name === 'string' && p.name.trim() && p.name.length <= 24) profile.name = p.name; }
+    applyBook(V.read(localStorage));
     demo = !trades.length;
   } catch { storageBroken = true; setTimeout(() => toast('已存数据无法读取，原始内容已保留。请到设置导出备份。'), 500); }
 }
@@ -86,7 +82,7 @@ function render() {
   $('ownBook').classList.toggle('active', !demo); $('demoBook').classList.toggle('active', demo);
   $('datasetLabel').textContent = demo ? '示例数据' : `${list.length} 笔交易`;
   $('navCount').textContent = activeTrades().length;
-  $('metrics').innerHTML = metric('累计净盈亏', `<small>¥</small>${money(s.total)}`, '按已记录的平仓交易统计', 'wallet', s.total >= 0 ? 'positive' : 'negative') + metric('交易胜率', `${s.winRate.toFixed(1)}<small>%</small>`, `${s.wins} 笔盈利 / ${s.count} 笔交易`, 'crosshair') + metric('平均盈亏比', s.averageRatio === null ? '—' : s.averageRatio.toFixed(2), '平均盈利 / 平均亏损绝对值', 'scale') + metric('交易笔数', s.count, `${s.clean} 笔无错误标签`, 'layers');
+  $('metrics').innerHTML = metric('累计净盈亏', `<small>¥</small>${money(s.total)}`, '仅已结束交易，不含持仓浮盈亏', 'wallet', s.total >= 0 ? 'positive' : 'negative') + metric('交易胜率', `${s.winRate.toFixed(1)}<small>%</small>`, `${s.wins} 笔盈利 / ${s.count} 笔已结束`, 'crosshair') + metric('平均盈亏比', s.averageRatio === null ? '—' : s.averageRatio.toFixed(2), '平均盈利 / 平均亏损绝对值', 'scale') + metric('已结束交易', s.count, `${s.openCount} 笔持仓中`, 'layers');
   $('recentCount').textContent = `${list.length} 笔`;
   $('recentTable').innerHTML = table(list.slice(0, 5));
   $('dailyInsight').textContent = (demo || hasMembership()) && s.errors.length ? `本期「${s.errors[0].name}」出现 ${s.errors[0].count} 次。${advice[s.errors[0].name] || '回看相关记录，明确下一次的改进动作。'}` : '稳定的执行，来自每一次认真复盘。';
@@ -106,7 +102,7 @@ function render() {
     if (errorChartInstance) { errorChartInstance.destroy(); errorChartInstance = null; }
     $('errorAnalysis').textContent = ''; $('reviewMetrics').textContent = ''; $('reviewNotes').textContent = '';
   }
-  icons();
+  renderPerformance(list, advanced); backupStatus(); icons();
 }
 function renderTable() {
   const list = filtered({ query: $('search').value, market: $('marketFilter').value, result: $('resultFilter').value });
@@ -115,6 +111,7 @@ function renderTable() {
   $('recordsSummary').textContent = `共 ${list.length} 笔交易 · 净盈亏 ¥${money(C.stats(list).total)}${demo ? ' · 示例账本' : ''}`;
   $('pageInfo').textContent = `第 ${page} / ${pages} 页`;
   $('prevPage').disabled = page <= 1; $('nextPage').disabled = page >= pages;
+  renderBatchBadges();
   icons();
 }
 function renderProfile() { $('profileName').innerHTML = `${esc(profile.name)}<small>${session?.user ? esc(session.user.phone) : '仅存于当前浏览器'}</small>`; $('avatar').textContent = [...profile.name][0]; $('bookName').value = profile.name; }
@@ -130,30 +127,48 @@ function route() {
 function confirmAction(title, text, action) { $('confirmTitle').textContent = title; $('confirmText').textContent = text; $('confirmAction').onclick = () => { try { action(); $('confirmDialog').close(); } catch (e) { toast(e.message); } }; $('confirmDialog').showModal(); }
 function tradeMode() {
   const contract = $('tradeMode').value === 'contract';
-  $('contractFields').hidden = !contract; $('manualPnlLabel').hidden = contract;
-  $('tradePnl').required = !contract;
-  $('contractFields').querySelectorAll('input').forEach(i => i.required = contract);
+  const batch = $('tradeMode').value === 'batch';
+  const readOnly = !!$('tradeId').dataset.readonly;
+  $('contractFields').hidden = !contract; $('manualPnlLabel').hidden = contract || batch; $('batchFields').hidden = !batch;
+  $('tradePnl').required = !contract && !batch; $('tradePnl').disabled = readOnly || contract || batch;
+  $('contractFields').querySelectorAll('input').forEach(i => { i.required = contract; i.disabled = readOnly || !contract; });
+  $('batchFields').querySelectorAll('input,select,button').forEach(i => { if (i.tagName === 'INPUT') i.required = batch; i.disabled = readOnly || !batch; });
+  $('tradeDate').readOnly = batch;
+  batchPreview();
   if (contract) { try { const pnl = C.calculatePnl(readForm()); $('pnlPreview').textContent = `预计净盈亏 ¥${money(pnl)}`; $('pnlPreview').className = pnl >= 0 ? 'positive' : 'negative'; } catch { $('pnlPreview').textContent = '待填写完整交易价格'; $('pnlPreview').className = 'muted'; } }
 }
 function openTrade(id) {
   const t = id ? activeTrades().find(t => t.id === id) : null;
   $('tradeForm').reset(); $('tradeError').textContent = ''; $('tradeId').value = t && !demo ? t.id : '';
+  formBaseRaw = bookState?.raw ?? localStorage.getItem(STORAGE_KEY);
   $('tradeDialogTitle').textContent = t ? demo ? '查看示例交易' : '编辑交易' : '记录一笔交易';
   $('tradeDate').value = t?.date || localDate(); $('tradeSymbol').value = t?.symbol || ''; $('tradeMarket').value = t?.market || '期货'; $('tradeDirection').value = t?.direction || '多'; $('tradePnl').value = t?.pnl ?? ''; $('tradeNote').value = t?.note || ''; $('openReason').value = t?.openReason || ''; $('tradeMode').value = t?.mode || 'contract';
   for (const key of ['openPrice', 'closePrice', 'volume', 'multiplier', 'fee']) $(key).value = t?.[key] ?? ({ volume: 1, multiplier: 100, fee: 0 }[key] ?? '');
   $('customErrors').value = t ? t.errors.filter(e => !C.ERRORS.includes(e)).join('，') : '';
   $('errorChoices').innerHTML = C.ERRORS.map(e => `<label><input type="checkbox" name="errors" value="${e}" ${(t?.errors || ['无错误']).includes(e) ? 'checked' : ''}>${e}</label>`).join('');
   const readOnly = !!t && demo;
+  $('tradeId').dataset.readonly = readOnly ? 'true' : '';
+  $('tradeStrategy').value = t?.strategy || '';
+  $('batchMultiplier').value = t?.multiplier || 100;
+  $('fillRows').textContent = '';
+  (t?.fills || [{ action: 'open' }, { action: 'close' }]).forEach(fill => addFill(fill, readOnly));
   $('tradeForm').querySelectorAll('input,select,textarea,button[type=submit]').forEach(el => el.disabled = readOnly);
   tradeMode(); $('tradeDialog').showModal();
 }
-function readForm() { const t = { id: $('tradeId').value || crypto.randomUUID(), date: $('tradeDate').value, symbol: $('tradeSymbol').value, market: $('tradeMarket').value, direction: $('tradeDirection').value, pnl: $('tradePnl').value, note: $('tradeNote').value, openReason: $('openReason').value, mode: $('tradeMode').value, errors: [...$('errorChoices').querySelectorAll('input:checked')].map(i => i.value) }; for (const key of ['openPrice', 'closePrice', 'volume', 'multiplier', 'fee']) t[key] = $(key).value; const custom = $('customErrors').value.split(/[,，]/).map(x => x.trim()).filter(Boolean); if (custom.length) t.errors = t.errors.filter(e => e !== '无错误').concat(custom); if (!t.errors.length) t.errors = ['无错误']; return t; }
+function readForm() { const t = { id: $('tradeId').value || crypto.randomUUID(), date: $('tradeDate').value, symbol: $('tradeSymbol').value, market: $('tradeMarket').value, direction: $('tradeDirection').value, pnl: $('tradePnl').value, note: $('tradeNote').value, openReason: $('openReason').value, strategy: $('tradeStrategy').value, mode: $('tradeMode').value, errors: [...$('errorChoices').querySelectorAll('input:checked')].map(i => i.value) }; for (const key of ['openPrice', 'closePrice', 'volume', 'multiplier', 'fee']) t[key] = $(key).value; if (t.mode === 'batch') { t.fills = readFills(); t.multiplier = $('batchMultiplier').value; t.date = t.fills.at(-1)?.date || t.date; } const custom = $('customErrors').value.split(/[,，]/).map(x => x.trim()).filter(Boolean); if (custom.length) t.errors = t.errors.filter(e => e !== '无错误').concat(custom); if (!t.errors.length) t.errors = ['无错误']; return t; }
 function download(content, name, type) { const url = URL.createObjectURL(new Blob([content], { type })); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 10000); }
 function report() {
   if (!demo && !hasMembership()) { $('printReport').textContent = ''; openVip(); return; }
   const list = filtered(); if (!list.length) return toast('暂无交易记录，无法生成报告');
   const s = C.stats(list);
   $('printReport').innerHTML = `<div class="print-heading"><h1>交易纠错本 · 专业复盘报告</h1><p>${esc(demo ? '示例账本' : profile.name)} · ${esc($('period').selectedOptions[0].text)} · 生成于 ${localDate()}</p></div><div class="print-stats"><p>交易 ${s.count} 笔　盈利 ${s.wins} 笔　胜率 ${s.winRate.toFixed(1)}%</p><p>净盈亏 ¥${money(s.total)}　平均盈亏比 ${s.averageRatio === null ? '不适用' : s.averageRatio.toFixed(2)}</p><p>最大单笔盈利 ¥${money(s.maxWin)}　最大单笔亏损 ¥${money(s.maxLoss)}</p></div><h2>高频错误与改进方案</h2>${s.errors.slice(0, 3).map(e => `<p>${esc(e.name)}（${e.count} 次）：${esc(advice[e.name] || '回顾对应交易，写下下一次可执行的改进动作。')}</p>`).join('') || '<p>暂无错误标签</p>'}<h2>完整交易记录</h2>${[...list].reverse().map(t => `<article class="print-trade"><h3>${esc(t.date)} · ${esc(t.symbol)} · 做${t.direction} · 净盈亏 ¥${money(t.pnl)}</h3>${t.mode === 'contract' ? `<p>开仓 ${t.openPrice}　平仓 ${t.closePrice}　${t.volume} 手　乘数 ${t.multiplier}　手续费 ${t.fee}</p>` : ''}<p>错误标签：${t.errors.map(esc).join('、')}</p><p>开仓理由：${esc(t.openReason || '未填写')}</p><p>教训与改进：${esc(t.note || '未填写')}</p></article>`).join('')}<p class="print-disclaimer">记录与复盘，不构成投资建议。</p>`;
+  $('printReport').querySelectorAll('.print-trade').forEach((element, index) => {
+    const trade = [...list].reverse()[index];
+    const details = document.createElement('div');
+    details.innerHTML = `<p>策略：${esc(trade.strategy || '未分类')}</p>${fillSummary(trade)}`;
+    if (trade.status === 'open') { const note = document.createElement('p'); note.textContent = '此笔持仓尚未结束，以上盈亏为已实现金额，不计入绩效汇总。'; details.appendChild(note); }
+    element.appendChild(details);
+  });
   window.print();
 }
 // Paid activation requires a signature; the optional browser trial has a separate local record.
@@ -337,7 +352,7 @@ function addExtraUI() {
   $('settingsView').insertAdjacentHTML('beforeend', '<section class="settings-section"><h2>账号与会员</h2><div class="setting-row"><div><h3>账号服务</h3><p id="accountStatus">账号服务暂未接通</p></div><button class="secondary" id="accountButton"><i data-lucide="user-round"></i>账号登录</button><button id="logoutButton" class="secondary" hidden>退出登录</button></div><div class="setting-row"><div><h3>会员中心</h3><p>月度会员 ¥19.90 / 30 天 · 永久会员 ¥199</p></div><button class="secondary" id="settingsVip"><i data-lucide="crown"></i>查看会员</button></div></section>');
   document.body.insertAdjacentHTML('beforeend', '<dialog id="authDialog"><div class="dialog-heading"><h2 id="authTitle">账号登录</h2><button class="icon-button" data-close="authDialog" aria-label="关闭"><i data-lucide="x"></i></button></div><div class="segmented auth-tabs"><button data-auth="login">登录</button><button data-auth="register">注册</button><button data-auth="reset">找回密码</button></div><p id="authNotice" class="auth-notice"></p><form id="authForm"><div class="form-grid"><label class="full">手机号<input id="authPhone" type="tel" pattern="1[3-9][0-9]{9}" maxlength="11" placeholder="11 位手机号" autocomplete="tel" required></label><label>短信验证码<input id="authCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label><div class="code-button"><button type="button" id="sendCode" class="secondary">获取验证码</button></div><label id="authPasswordLabel" class="full" hidden>设置密码（8 至 64 位，包含字母和数字）<input id="authPassword" type="password" minlength="8" maxlength="64" autocomplete="new-password"></label></div><p class="form-error" id="authError" role="alert"></p><div class="auth-legal"><input type="checkbox" id="authAgree" required><label for="authAgree">我已阅读并同意</label><button type="button" data-policy="terms">用户协议</button><span>与</span><button type="button" data-policy="privacy">隐私说明</button></div><div class="dialog-actions"><button class="primary" id="authSubmit" type="submit">登录</button></div></form></dialog><dialog id="policyDialog"><div class="dialog-heading"><h2 id="policyTitle"></h2><button class="icon-button" data-close="policyDialog" aria-label="关闭"><i data-lucide="x"></i></button></div><div id="policyText" class="policy-text"></div></dialog><div id="printReport"></div>');
 }
-load(); addExtraUI();
+load(); addExtraUI(); setupWorkflows();
 $('today').textContent = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
 $('newTrade').onclick = () => openTrade();
 $('ownBook').onclick = () => { demo = false; page = 1; render(); }; $('demoBook').onclick = () => { demo = true; page = 1; render(); };
@@ -349,11 +364,12 @@ document.addEventListener('click', e => {
   if (b.dataset.goto) location.hash = b.dataset.goto;
   if (b.hasAttribute('data-new')) openTrade();
   if (b.dataset.edit) openTrade(b.dataset.edit);
-  if (b.dataset.delete) { const t = trades.find(t => t.id === b.dataset.delete); if (t) confirmAction('删除这笔交易？', `${t.date} · ${t.symbol} · 净盈亏 ¥${money(t.pnl)}。删除后无法撤销。`, () => { saveTrades(trades.filter(x => x.id !== t.id)); render(); toast('交易已删除'); }); }
+  if (b.dataset.delete) { const t = trades.find(t => t.id === b.dataset.delete), expectedRaw = bookState?.raw; if (t) confirmAction('删除这笔交易？', `${t.date} · ${t.symbol} · 净盈亏 ¥${money(t.pnl)}。删除前将保留一个恢复快照。`, () => { saveTrades(trades.filter(x => x.id !== t.id), { snapshot: true, expectedRaw }); render(); toast('交易已删除'); }); }
   if (b.dataset.close) $(b.dataset.close).close();
   if (b.hasAttribute('data-open-activation')) openActivation();
   if (b.hasAttribute('data-open-vip')) openVip();
   if (b.hasAttribute('data-start-trial')) startTrial();
+  if (b.hasAttribute('data-backup')) exportBackup();
   if (b.hasAttribute('data-copy-device')) {
     try {
       loadDevice();
@@ -363,16 +379,16 @@ document.addEventListener('click', e => {
   if (b.dataset.auth) openAuth(b.dataset.auth);
   if (b.dataset.policy) { const privacy = b.dataset.policy === 'privacy'; $('policyTitle').textContent = privacy ? '隐私说明' : '用户协议'; $('policyText').textContent = privacy ? '交易、笔记、随机生成的设备编号、试用领取时间和已验证的激活码保存在当前浏览器，不会自动上传。GitHub Pages 可能处理访问日志。付款在微信中完成；核账时由你主动将付款凭证及设备编号发送给客服，客服在本机记录交易单号与签发信息。清除浏览器数据会移除账本及设备编号，请保留账本备份和激活码；换设备请联系客服。当前未接通在线账号服务，不发送手机号或密码。' : '本工具用于交易记录与复盘，不提供交易执行或投资建议。基础记账、统计、CSV 和数据备份免费；个人盈亏图表、错误分析与完整复盘报告为会员功能，示例账本可免费预览。免费试用每个浏览器限领一次，从主动领取时起连续 7 天，开放全部会员功能，无需付款且不自动扣费。试用到期不删除交易数据，基础记账与备份仍可使用。月度会员 19.90 元，从激活码签发时起 30 天，续费顺延；永久会员 199 元，无固定到期日。付费会员有效期独立计算，不叠加剩余试用天数。微信付款后由客服核账并签发绑定浏览器设备编号的激活码，本站不自动确认付款。换设备、退款和服务安排请与客服确认。'; $('policyDialog').showModal(); }
 });
-$('tradeForm').onsubmit = e => { e.preventDefault(); try { const t = C.validateTrade(readForm()); const next = [...trades]; const i = next.findIndex(x => x.id === t.id); if (i >= 0) next[i] = t; else next.push(t); saveTrades(next); demo = false; $('tradeDialog').close(); render(); toast(i >= 0 ? '交易已更新' : '交易已保存到我的账本'); } catch (error) { $('tradeError').textContent = error.message; } };
+$('tradeForm').onsubmit = e => { e.preventDefault(); try { const t = C.validateTrade(readForm()); const next = [...trades]; const i = next.findIndex(x => x.id === t.id); if (i >= 0) next[i] = t; else next.push(t); saveTrades(next, { expectedRaw: formBaseRaw, snapshot: i >= 0 }); demo = false; $('tradeDialog').close(); render(); toast(i >= 0 ? '交易已更新' : '交易已保存到我的账本'); } catch (error) { $('tradeError').textContent = error.message; } };
 $('tradeMode').onchange = tradeMode; $('tradeDirection').onchange = tradeMode; $('contractFields').oninput = tradeMode;
 $('errorChoices').onchange = e => { if (e.target.checked) $('errorChoices').querySelectorAll('input').forEach(i => { if (i !== e.target && (e.target.value === '无错误' || i.value === '无错误')) i.checked = false; }); };
 $('profileButton').onclick = () => location.hash = 'settings';
-$('profileForm').onsubmit = e => { e.preventDefault(); try { const name = $('bookName').value.trim(); if (!name || name.length > 24) throw new Error('账本名称应为 1 至 24 个字'); write(PROFILE_KEY, { name }); profile.name = name; renderProfile(); toast('账本名称已保存'); } catch (error) { toast(error.message); } };
+$('profileForm').onsubmit = e => { e.preventDefault(); try { const name = $('bookName').value.trim(); if (!name || name.length > 24) throw new Error('账本名称应为 1 至 24 个字'); if (storageBroken) throw new Error('请先恢复有效账本'); applyBook(V.commit(localStorage, bookState.raw, { version: 2, trades, profile: { name } }, { snapshot: true })); render(); toast('账本名称已保存'); } catch (error) { toast(error.message); } };
 $('exportCsv').onclick = () => { const list = filtered(currentView === 'trades' ? { query: $('search').value, market: $('marketFilter').value, result: $('resultFilter').value } : {}); if (!list.length) return toast('暂无可导出的记录'); download(C.csv(list), `${demo ? '示例账本' : '交易记录'}-${localDate()}.csv`, 'text/csv;charset=utf-8'); };
 $('exportPdfBtn').onclick = report;
-$('backupButton').onclick = () => { try { download(storageBroken ? localStorage.getItem(STORAGE_KEY) || '{}' : JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), trades }, null, 2), `交易纠错本备份-${localDate()}.json`, 'application/json'); } catch (e) { toast(e.message); } };
+$('backupButton').onclick = exportBackup;
 $('importButton').onclick = () => $('importFile').click();
-$('importFile').onchange = async e => { const file = e.target.files[0]; if (!file) return; try { if (file.size > 20000000) throw new Error('备份文件不能超过 20 MB'); const next = C.validateBackup(JSON.parse(await file.text())); confirmAction('恢复账本备份？', `备份包含 ${next.length} 笔交易，将替换我的账本现有的 ${trades.length} 笔记录。请确认已导出当前备份。`, () => { write(STORAGE_KEY, { version: 1, trades: next }); storageBroken = false; trades = next; demo = false; render(); toast('备份已恢复'); }); } catch (error) { toast(error instanceof SyntaxError ? 'JSON 文件格式不正确' : error.message); } finally { e.target.value = ''; } };
+$('importFile').onchange = async e => { await prepareRestore(e.target.files[0]); e.target.value = ''; };
 $('openVipModal').onclick = openVip; $('settingsVip').onclick = openVip; $('closeVipModal').onclick = () => $('vipModal').close(); $('vipModal').addEventListener('close', stopPoll);
 document.querySelectorAll('.pay-manual').forEach(b => b.onclick = () => openManualPayment(b.dataset.goods));
 $('vipSupport').onclick = () => openSupport('plans');
@@ -413,6 +429,6 @@ window.addEventListener('storage', e => { if (e.key === STORAGE_KEY || e.key ===
 window.addEventListener('pagehide', stopPoll);
 route(); updateMembership(); restoreLicense();
 let lastMembershipStatus = JSON.stringify(currentMembership());
-function checkExpiry() { loadTrial(); const status = JSON.stringify(currentMembership()); updateMembership(); if (status !== lastMembershipStatus) { lastMembershipStatus = status; $('printReport').textContent = ''; render(); } }
+function checkExpiry() { loadTrial(); const status = JSON.stringify(currentMembership()); updateMembership(); backupStatus(); if (status !== lastMembershipStatus) { lastMembershipStatus = status; $('printReport').textContent = ''; render(); } }
 setInterval(checkExpiry, 15000); window.addEventListener('focus', checkExpiry);
 if (apiBase()) refreshSession().then(() => { const no = pendingOrder(); if (no && session?.user) { openVip(); startOrderPoll(no); } }).catch(() => toast('账号服务暂时不可用，本地账本仍可使用'));

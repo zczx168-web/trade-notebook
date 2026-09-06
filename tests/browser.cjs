@@ -42,7 +42,7 @@ const url = process.env.TEST_URL || pathToFileURL(path.join(root, 'site/index.ht
     await page.locator('#settingsVip').click(); await expect(page.locator('#paymentNotice')).toContainText('人工核验'); await expect(page.locator('.pay-manual').first()).toBeEnabled(); await expect(page.locator('.pay-wechat').first()).toBeHidden(); await page.locator('#closeVipModal').click();
     await page.locator('#accountButton').click(); await expect(page.locator('#authSubmit')).toBeDisabled(); await page.locator('[data-auth=register]').click(); await expect(page.locator('#authPassword')).toBeVisible(); await page.locator('[data-close=authDialog]').click();
     await page.locator('[data-view=trades]').click(); await page.locator('[data-delete]').filter({ visible: true }).first().click(); await page.locator('#confirmAction').click(); await expect(page.locator('#allTable')).toContainText('还没有交易记录');
-    await page.locator('[data-view=settings]').click(); await page.locator('#importFile').setInputFiles(path.join(output, 'backup.json')); await expect(page.locator('#confirmText')).toContainText('1 笔'); await page.locator('#confirmAction').click();
+    await page.locator('[data-view=settings]').click(); await page.locator('#importFile').setInputFiles(path.join(output, 'backup.json')); await expect(page.locator('#restoreSummary')).toContainText('1 笔'); await page.locator('#applyRestore').click();
     await page.locator('[data-view=overview]').click(); await expect(page.locator('#recentTable')).toContainText('焦煤2611');
     await page.locator('#demoBook').click();
     await page.evaluate(() => { window.print = () => {}; }); await page.locator('#exportPdfBtn').click();

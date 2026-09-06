@@ -15,18 +15,22 @@ function startAdmin({ directory, port = 0, trustedKey } = {}) {
   const bootstrapToken = crypto.randomBytes(32).toString('hex');
   const sessionToken = crypto.randomBytes(32).toString('hex');
   const csrf = crypto.randomBytes(32).toString('hex');
+  let lastActive = 0;
   const uiRoot = path.join(__dirname, '..', 'admin');
   let origin;
   const server = http.createServer(async (req, res) => {
     const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'" };
     const send = (status, value) => { res.writeHead(status, { ...headers, 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(value)); };
     if (req.headers.host !== origin.slice(7)) return send(403, { error: '仅允许本机访问' });
-    const url = new URL(req.url, origin);
+    let url;
+    try { url = new URL(req.url, origin); } catch { return send(400, { error: '请求地址无效' }); }
     if (req.method === 'GET' && url.pathname === '/start/' + bootstrapToken) {
+      lastActive = Date.now();
       res.writeHead(303, { ...headers, Location: '/', 'Set-Cookie': `tn_issuer=${sessionToken}; HttpOnly; SameSite=Strict; Path=/` });
       return res.end();
     }
-    if (!(req.headers.cookie || '').split(';').some(cookie => cookie.trim() === 'tn_issuer=' + sessionToken)) return send(401, { error: '请从本机“会员开通工具”启动' });
+    if (Date.now() - lastActive > 30 * 60 * 1000 || !(req.headers.cookie || '').split(';').some(cookie => cookie.trim() === 'tn_issuer=' + sessionToken)) return send(401, { error: '会话已过期，请从本机“会员开通工具”重新启动' });
+    lastActive = Date.now();
     try {
       if (req.method === 'GET' && url.pathname === '/api/state') return send(200, { csrf, records: readState(store.directory).records.slice(-100).reverse() });
       if (req.method === 'POST' && url.pathname === '/api/issue') {
