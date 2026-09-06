@@ -1,0 +1,18 @@
+{
+  "name": "trade-notebook",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A Chinese trading journal for GitHub Pages",
+  "scripts": {
+    "vendor": "node scripts/vendor.cjs",
+    "test": "node --test tests/core.test.cjs",
+    "test:browser": "node tests/browser.cjs"
+  },
+  "dependencies": {
+    "chart.js": "4.5.0",
+    "lucide": "0.468.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
