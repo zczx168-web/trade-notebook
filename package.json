@@ -14,7 +14,7 @@
     "check:security": "node scripts/security-check.cjs"
   },
   "dependencies": {
-    "chart.js": "4.5.0",
+    "chart.js": "4.5.1",
     "decimal.js": "10.6.0",
     "lucide": "0.468.0"
   },
