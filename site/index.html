@@ -8,14 +8,14 @@
   <title>交易纠错本 · 复盘工作台</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="payments.css?v=20260906-activation1">
-  <link rel="stylesheet" href="membership.css?v=20260906-activation1">
+  <link rel="stylesheet" href="membership.css?v=20260906-trial1">
   <script defer src="vendor/lucide.js"></script>
   <script defer src="vendor/chart.umd.js"></script>
   <script defer src="config.js?v=20260906"></script>
   <script defer src="core.js"></script>
   <script defer src="license-key.js?v=20260906-activation1"></script>
   <script defer src="license-core.js?v=20260906-activation1"></script>
-  <script defer src="app.js?v=20260906-activation1"></script>
+  <script defer src="app.js?v=20260906-trial1"></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -58,6 +58,7 @@
   <dialog id="tradeDialog"><form id="tradeForm"><div class="dialog-heading"><div><span class="eyebrow">TRADE JOURNAL</span><h2 id="tradeDialogTitle">记录一笔交易</h2></div><button type="button" class="icon-button" data-close="tradeDialog" aria-label="关闭"><i data-lucide="x"></i></button></div><input id="tradeId" type="hidden"><div class="form-grid"><label>交易日期<input type="date" id="tradeDate" required></label><label>交易品种<input id="tradeSymbol" placeholder="例如：螺纹钢 RB2610" maxlength="24" required></label><label>市场<select id="tradeMarket"><option>期货</option><option>股票</option><option>外汇</option><option>其他</option></select></label><label>方向<select id="tradeDirection"><option value="多">做多</option><option value="空">做空</option></select></label><label class="full">净盈亏（元，亏损填负数）<input id="tradePnl" type="number" step="0.01" min="-1000000000" max="1000000000" placeholder="0.00" required></label><fieldset class="full"><legend>错误标签</legend><div id="errorChoices" class="error-choices"></div></fieldset><label class="full">复盘笔记<textarea id="tradeNote" rows="4" maxlength="2000" placeholder="入场依据、执行偏差，以及下一次的改进…"></textarea></label></div><p class="form-error" id="tradeError" role="alert"></p><div class="dialog-actions"><button type="button" class="secondary" data-close="tradeDialog">取消</button><button type="submit" class="primary"><i data-lucide="check"></i>保存交易</button></div></form></dialog>
   <dialog id="vipModal" class="vip-dialog" aria-labelledby="vipTitle">
     <div class="dialog-heading"><div><span class="eyebrow">MEMBERSHIP</span><h2 id="vipTitle">会员中心</h2></div><button class="icon-button" id="closeVipModal" aria-label="关闭会员中心"><i data-lucide="x"></i></button></div>
+    <section class="trial-offer" aria-labelledby="trialTitle"><div><h3 id="trialTitle">免费试用 7 天</h3><p id="trialStatus" role="status">领取后开放全部会员功能，无需付款，不自动扣费。</p><p class="license-hint">每个浏览器限领一次，从领取时起连续计算 7 天。</p></div><button class="primary" data-start-trial><i data-lucide="gift"></i><span>免费试用 7 天</span></button></section>
     <div class="payment-notice"><i data-lucide="info"></i><span id="paymentNotice">微信扫码收款 · 客服人工核验，不会自动开通。</span></div>
     <div class="plans">
       <article class="plan"><i data-lucide="calendar-days"></i><h3>月度会员</h3><div class="plan-price">¥19.90<span>/ 30 天</span></div><p>会员有效期 30 天</p><button class="pay-manual secondary" data-goods="month"><i data-lucide="qr-code"></i>微信扫码</button><button class="pay-wechat secondary" data-goods="month" hidden><i data-lucide="wallet"></i>微信在线支付</button><button class="pay-alipay secondary" data-goods="month" hidden><i data-lucide="wallet"></i>支付宝</button></article>

@@ -8,7 +8,8 @@
     "test": "node --test tests/core.test.cjs tests/license.test.cjs tests/issuer-http.test.cjs",
     "test:browser": "node tests/browser.cjs",
     "test:payments": "node tests/payments.cjs",
-    "test:activation": "node tests/activation.cjs"
+    "test:activation": "node tests/activation.cjs",
+    "test:trial": "node tests/trial.cjs"
   },
   "dependencies": {
     "chart.js": "4.5.0",

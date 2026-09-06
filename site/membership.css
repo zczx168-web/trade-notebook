@@ -1,4 +1,7 @@
 .license-device{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:16px;margin-top:18px;text-align:left}
+.trial-offer{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 0 20px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+.trial-offer>div{min-width:0;flex:1}.trial-offer h3{font-size:16px;margin:0 0 8px}.trial-offer p{font-size:12px;line-height:1.8;overflow-wrap:anywhere}.trial-offer>.primary{flex-shrink:0;min-height:40px}.trial-offer .license-hint{font-size:11px}
+@media(max-width:600px){.trial-offer{align-items:stretch;flex-direction:column}.trial-offer>.primary{justify-content:center}}
 .license-device>div{flex:1;min-width:0}
 .license-device span{font-size:10px;color:#8b998e}
 .license-device code{display:block;margin-top:7px;font-size:12px;line-height:1.7;overflow-wrap:anywhere;word-break:break-all;color:#4a6956}
