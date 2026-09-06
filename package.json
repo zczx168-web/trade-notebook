@@ -16,7 +16,7 @@
   "dependencies": {
     "chart.js": "4.5.0",
     "decimal.js": "10.6.0",
-    "lucide": "0.468.0"
+    "lucide": "1.40.0"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"
