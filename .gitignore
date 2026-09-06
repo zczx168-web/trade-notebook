@@ -3,3 +3,7 @@ test-results/
 .env
 .env.*
 !.env.example
+.issuer/
+*.private.pem
+issuer-state.json
+issuer-runtime.json

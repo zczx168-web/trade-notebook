@@ -1,0 +1,26 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { initialize } = require('../scripts/issuer-lib.cjs');
+const { startAdmin } = require('../scripts/license-admin.cjs');
+test('local issuer rejects unauthenticated, cross-origin and missing-CSRF issuance and does not serve keys', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'trade-issuer-http-'));
+  const store = initialize(directory);
+  const app = await startAdmin({ directory, trustedKey: store.publicKey });
+  t.after(async () => { app.server.closeAllConnections(); await new Promise(resolve => app.server.close(resolve)); fs.rmSync(directory, { recursive: true, force: true }); });
+  assert.equal(app.server.address().address, '127.0.0.1');
+  assert.equal((await fetch(app.origin + '/api/state')).status, 401);
+  const bootstrap = await fetch(app.url, { redirect: 'manual' });
+  assert.equal(bootstrap.status, 303);
+  const cookie = bootstrap.headers.get('set-cookie').split(';')[0];
+  const state = await (await fetch(app.origin + '/api/state', { headers: { Cookie: cookie } })).json();
+  const payload = { device: 'TN-' + 'C'.repeat(32), plan: 'month', reference: 'WECHATHTTP001', confirmed: true };
+  const headers = { Cookie: cookie, 'Content-Type': 'application/json', Origin: app.origin, 'X-CSRF-Token': state.csrf };
+  assert.equal((await fetch(app.origin + '/api/issue', { method: 'POST', headers: { ...headers, Origin: 'https://evil.example' }, body: JSON.stringify(payload) })).status, 403);
+  assert.equal((await fetch(app.origin + '/api/issue', { method: 'POST', headers: { ...headers, 'X-CSRF-Token': '' }, body: JSON.stringify(payload) })).status, 403);
+  for (const file of ['/issuer.private.pem', '/issuer-state.json', '/scripts/issuer-lib.cjs']) assert.equal((await fetch(app.origin + file, { headers: { Cookie: cookie } })).status, 404);
+  const response = await fetch(app.origin + '/api/issue', { method: 'POST', headers, body: JSON.stringify(payload) });
+  assert.equal(response.status, 200); assert.ok((await response.json()).token.startsWith('TN1.'));
+});

@@ -1,0 +1,23 @@
+.license-device{display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);padding-top:16px;margin-top:18px;text-align:left}
+.license-device>div{flex:1;min-width:0}
+.license-device span{font-size:10px;color:#8b998e}
+.license-device code{display:block;margin-top:7px;font-size:12px;line-height:1.7;overflow-wrap:anywhere;word-break:break-all;color:#4a6956}
+.license-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+.license-entry>span{font-size:11px;color:#7b8d80}
+.license-hint{font-size:10px;line-height:1.9;color:#8b9a90;margin-top:10px}
+.license-hint[data-device-copy-status]{margin-top:6px;min-height:17px;color:var(--green)}
+.support-activate{display:flex;margin:10px auto 0}
+.activation-status{font-size:12px;color:#4d7960;line-height:1.8}
+#activationForm{margin-top:18px}
+#activationForm>label{display:flex;flex-direction:column;gap:10px;font-size:12px}
+#activationToken{font:11px/1.8 monospace;word-break:break-all;width:100%;resize:vertical}
+.activation-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.activation-message{font-size:12px;color:var(--green);line-height:1.8;margin-top:12px}
+#activationSupport{margin-top:12px;color:var(--green)}
+.member-gate{padding:37px 20px;border-block:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;margin-bottom:24px;background:#f8faf8}
+.member-gate>svg{width:27px;height:27px;color:#8b9f8e}
+.member-gate h3{font-size:16px}
+.member-gate p{font-size:12px;line-height:1.8;color:#8b978e}
+.member-gate button{margin-top:5px}
+#activationEntrySettings{margin-top:15px}
+@media(max-width:600px){.license-device code{font-size:11px}.activation-actions{align-items:stretch;flex-direction:column}.license-entry{flex-wrap:wrap}.member-gate{padding:30px 15px}.member-gate h3{font-size:15px}#activationToken{font-size:10px}.support-dialog>.payment-qr{max-width:225px}}

@@ -14,6 +14,7 @@ let trades = [], profile = { name: '我的交易账本' }, demo = true, storageB
 let currentView = 'overview', page = 1, profitChartInstance, errorChartInstance, toastTimer;
 let session = null, payPollTimer, pollGeneration = 0, authBusy = false, authMode = 'login', codeDeadline = 0;
 let manualPlan = null, supportReturn = 'plans';
+let deviceId = '', verifiedLicense = null, licenseRestoreError = '', licenseRevision = 0;
 const titles = { overview: ['复盘总览', '把每一次交易，变成下一次进步。'], trades: ['交易记录', '记录决策的依据，也记录真实的结果。'], review: ['错误分析', '找到重复的偏差，让下一笔更有纪律。'], settings: ['账本设置', '管理你的交易账本与数据备份。'] };
 function icons() { if (window.lucide) lucide.createIcons(); }
 function toast(message) { clearTimeout(toastTimer); $('toast').textContent = message; $('toast').hidden = false; toastTimer = setTimeout(() => $('toast').hidden = true, 4500); }
@@ -85,12 +86,23 @@ function render() {
   $('metrics').innerHTML = metric('累计净盈亏', `<small>¥</small>${money(s.total)}`, '按已记录的平仓交易统计', 'wallet', s.total >= 0 ? 'positive' : 'negative') + metric('交易胜率', `${s.winRate.toFixed(1)}<small>%</small>`, `${s.wins} 笔盈利 / ${s.count} 笔交易`, 'crosshair') + metric('平均盈亏比', s.averageRatio === null ? '—' : s.averageRatio.toFixed(2), '平均盈利 / 平均亏损绝对值', 'scale') + metric('交易笔数', s.count, `${s.clean} 笔无错误标签`, 'layers');
   $('recentCount').textContent = `${list.length} 笔`;
   $('recentTable').innerHTML = table(list.slice(0, 5));
-  $('dailyInsight').textContent = s.errors.length ? `本期「${s.errors[0].name}」出现 ${s.errors[0].count} 次。${advice[s.errors[0].name] || '回看相关记录，明确下一次的改进动作。'}` : '稳定的执行，来自每一次认真复盘。';
+  $('dailyInsight').textContent = (demo || hasMembership()) && s.errors.length ? `本期「${s.errors[0].name}」出现 ${s.errors[0].count} 次。${advice[s.errors[0].name] || '回看相关记录，明确下一次的改进动作。'}` : '稳定的执行，来自每一次认真复盘。';
   $('reviewMetrics').innerHTML = metric('无错误交易占比', `${s.count ? Math.round(s.clean / s.count * 100) : 0}<small>%</small>`, `${s.clean} 笔交易标记为无错误`, 'shield-check', 'positive') + metric('最大单笔盈利', `<small>¥</small>${money(s.maxWin)}`, `最大单笔亏损 ¥${money(s.maxLoss)}`, 'trending-up') + metric('最大日终回撤', `<small>¥</small>${fmt.format(s.drawdown)}`, '累计已实现盈亏从高点回落的最大金额', 'trending-down');
   $('errorAnalysis').innerHTML = s.errors.length ? s.errors.map((e, i) => `<div class="error-analysis-row"><span><span class="rank">${String(i + 1).padStart(2, '0')}</span>${esc(e.name)}</span><div class="bar-track"><div class="bar-fill" style="width:${e.count / s.errors[0].count * 100}%"></div></div><span class="muted">${e.count} 次</span><span class="loss-value">关联亏损 ¥${fmt.format(e.loss)}</span></div>${i < 3 ? `<p class="error-advice">${esc(advice[e.name] || '复核入场与退出条件，为下一笔交易写下明确的改进动作。')}</p>` : ''}`).join('') : '<div class="empty-state"><i data-lucide="shield-check"></i><h3>暂无交易错误</h3><p>标记交易中的偏差后，在这里查看归因。</p></div>';
   $('reviewNotes').innerHTML = list.filter(t => t.note || t.openReason).map(t => `<article class="review-note"><div><h3>${esc(t.symbol)}</h3><small>${esc(t.date)} · ${esc(t.direction)} · ${money(t.pnl)}</small></div><div>${t.openReason ? `<p><b>开仓理由：</b>${esc(t.openReason)}</p>` : ''}<p>${esc(t.note)}</p></div></article>`).join('') || '<p class="muted">暂无复盘笔记</p>';
   renderTable(); renderProfile();
-  if (currentView === 'overview') charts(s);
+  const advanced = demo || hasMembership();
+  $('analyticsContent').hidden = !advanced;
+  $('analyticsLocked').hidden = advanced;
+  $('reviewContent').hidden = !advanced;
+  $('reviewLocked').hidden = advanced;
+  if (advanced && currentView === 'overview') charts(s);
+  if (!advanced) {
+    $('printReport').textContent = '';
+    if (profitChartInstance) { profitChartInstance.destroy(); profitChartInstance = null; }
+    if (errorChartInstance) { errorChartInstance.destroy(); errorChartInstance = null; }
+    $('errorAnalysis').textContent = ''; $('reviewMetrics').textContent = ''; $('reviewNotes').textContent = '';
+  }
   icons();
 }
 function renderTable() {
@@ -135,16 +147,58 @@ function openTrade(id) {
 function readForm() { const t = { id: $('tradeId').value || crypto.randomUUID(), date: $('tradeDate').value, symbol: $('tradeSymbol').value, market: $('tradeMarket').value, direction: $('tradeDirection').value, pnl: $('tradePnl').value, note: $('tradeNote').value, openReason: $('openReason').value, mode: $('tradeMode').value, errors: [...$('errorChoices').querySelectorAll('input:checked')].map(i => i.value) }; for (const key of ['openPrice', 'closePrice', 'volume', 'multiplier', 'fee']) t[key] = $(key).value; const custom = $('customErrors').value.split(/[,，]/).map(x => x.trim()).filter(Boolean); if (custom.length) t.errors = t.errors.filter(e => e !== '无错误').concat(custom); if (!t.errors.length) t.errors = ['无错误']; return t; }
 function download(content, name, type) { const url = URL.createObjectURL(new Blob([content], { type })); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 10000); }
 function report() {
+  if (!demo && !hasMembership()) { $('printReport').textContent = ''; openVip(); return; }
   const list = filtered(); if (!list.length) return toast('暂无交易记录，无法生成报告');
   const s = C.stats(list);
   $('printReport').innerHTML = `<div class="print-heading"><h1>交易纠错本 · 专业复盘报告</h1><p>${esc(demo ? '示例账本' : profile.name)} · ${esc($('period').selectedOptions[0].text)} · 生成于 ${localDate()}</p></div><div class="print-stats"><p>交易 ${s.count} 笔　盈利 ${s.wins} 笔　胜率 ${s.winRate.toFixed(1)}%</p><p>净盈亏 ¥${money(s.total)}　平均盈亏比 ${s.averageRatio === null ? '不适用' : s.averageRatio.toFixed(2)}</p><p>最大单笔盈利 ¥${money(s.maxWin)}　最大单笔亏损 ¥${money(s.maxLoss)}</p></div><h2>高频错误与改进方案</h2>${s.errors.slice(0, 3).map(e => `<p>${esc(e.name)}（${e.count} 次）：${esc(advice[e.name] || '回顾对应交易，写下下一次可执行的改进动作。')}</p>`).join('') || '<p>暂无错误标签</p>'}<h2>完整交易记录</h2>${[...list].reverse().map(t => `<article class="print-trade"><h3>${esc(t.date)} · ${esc(t.symbol)} · 做${t.direction} · 净盈亏 ¥${money(t.pnl)}</h3>${t.mode === 'contract' ? `<p>开仓 ${t.openPrice}　平仓 ${t.closePrice}　${t.volume} 手　乘数 ${t.multiplier}　手续费 ${t.fee}</p>` : ''}<p>错误标签：${t.errors.map(esc).join('、')}</p><p>开仓理由：${esc(t.openReason || '未填写')}</p><p>教训与改进：${esc(t.note || '未填写')}</p></article>`).join('')}<p class="print-disclaimer">记录与复盘，不构成投资建议。</p>`;
   window.print();
 }
-// Browser data never grants membership; both order status and entitlement come from the API.
+// Manual entitlements require a verified signature; local flags and payment clicks grant nothing.
 function apiBase() { const raw = window.TRADE_CONFIG?.apiBase; if (!raw) return ''; try { const u = new URL(raw); return u.protocol === 'https:' ? u.href.replace(/\/$/, '') : ''; } catch { return ''; } }
 async function request(path, body) { const base = apiBase(); if (!base) throw new Error('服务尚未接通'); const res = await fetch(base + path, { method: body ? 'POST' : 'GET', credentials: 'include', headers: body ? { 'Content-Type': 'application/json', 'X-CSRF-Token': session?.csrfToken || '' } : {}, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15000) }); if (!res.ok) throw new Error(res.status === 401 ? '请先登录账号' : '服务暂时不可用，请稍后重试'); return res.json(); }
-async function refreshSession() { if (!apiBase()) return; session = await request('/me'); if (!session || typeof session !== 'object') throw new Error('账号服务返回异常'); updateMembership(); renderProfile(); }
-function updateMembership() { const m = session?.membership; const text = m?.type === 'forever' ? '永久会员' : m?.type === 'month' && Number.isFinite(Date.parse(m.expiresAt)) && Date.parse(m.expiresAt) > Date.now() ? `月度会员 · 至 ${m.expiresAt.slice(0, 10)}` : '普通版'; $('memberStatus').textContent = text; $('settingsMembership').textContent = text; $('accountStatus').textContent = session?.user ? `已登录 ${session.user.phone} · 交易记录仍保存在当前浏览器` : apiBase() ? '尚未登录' : '账号服务暂未接通'; $('logoutButton').hidden = !session?.user; }
+async function refreshSession() { if (!apiBase()) return; session = await request('/me'); if (!session || typeof session !== 'object') throw new Error('账号服务返回异常'); updateMembership(); renderProfile(); render(); }
+function currentMembership() {
+  const remote = session?.membership;
+  const activeLocal = TradeLicense.isActive(verifiedLicense);
+  if (remote?.type === 'forever' || (activeLocal && verifiedLicense.plan === 'forever')) return { type: 'forever', expire: 0 };
+  const remoteExpiry = remote?.type === 'month' ? Date.parse(remote.expiresAt) : 0;
+  const expiry = Math.max(Number.isFinite(remoteExpiry) ? remoteExpiry : 0, activeLocal ? verifiedLicense.expiresAt : 0);
+  return expiry > Date.now() ? { type: 'month', expire: expiry } : { type: 'free', expire: 0 };
+}
+function hasMembership() { return currentMembership().type !== 'free'; }
+function updateMembership() {
+  const m = currentMembership();
+  const text = m.type === 'forever' ? '永久会员' : m.type === 'month' ? `月度会员 · 至 ${new Date(m.expire).toLocaleDateString('zh-CN')}` : verifiedLicense?.plan === 'month' ? '月度会员已到期' : '普通版';
+  $('memberStatus').textContent = text; $('settingsMembership').textContent = text;
+  $('vipLicenseStatus').textContent = text; $('activationStatus').textContent = '当前状态：' + text;
+  $('accountStatus').textContent = session?.user ? `已登录 ${session.user.phone} · 交易记录仍保存在当前浏览器` : apiBase() ? '尚未登录' : '账号服务暂未接通，会员可使用激活码开通';
+  $('logoutButton').hidden = !session?.user;
+}
+function loadDevice() {
+  const saved = localStorage.getItem(TradeLicense.DEVICE_KEY);
+  if (saved && !TradeLicense.DEVICE_PATTERN.test(saved)) throw new Error('设备编号损坏，请联系客服核对原设备编号');
+  deviceId = saved || 'TN-' + crypto.randomUUID().replaceAll('-', '').toUpperCase();
+  if (!saved) localStorage.setItem(TradeLicense.DEVICE_KEY, deviceId);
+  document.querySelectorAll('[data-device-code]').forEach(element => element.textContent = deviceId);
+  return deviceId;
+}
+async function restoreLicense() {
+  const revision = ++licenseRevision;
+  let claims = null, error = '';
+  try { loadDevice(); const token = localStorage.getItem(TradeLicense.TOKEN_KEY); if (token) claims = await TradeLicense.verify(token, window.TRADE_LICENSE_PUBLIC_KEY, deviceId); }
+  catch (failure) { error = failure.message; }
+  if (revision !== licenseRevision) return;
+  verifiedLicense = claims; licenseRestoreError = error;
+  updateMembership(); render();
+}
+function openActivation() {
+  ['vipModal', 'manualPayDialog', 'supportDialog'].forEach(id => $(id).close());
+  try { loadDevice(); } catch (error) { licenseRestoreError = error.message; }
+  $('activationError').textContent = licenseRestoreError;
+  $('activationMessage').textContent = '';
+  updateMembership();
+  if (!$('activationDialog').open) $('activationDialog').showModal();
+}
 function openVip() {
   const available = !!apiBase(), manual = !!window.TRADE_CONFIG?.manualPayment;
   $('paymentNotice').textContent = manual ? '微信扫码收款 · 客服人工核验，不会自动开通。' : available ? '付款结果以支付服务确认的订单状态为准。' : '支付服务暂未接通，当前不可购买。';
@@ -232,6 +286,10 @@ function startOrderPoll(orderNo) {
 }
 function openAuth(mode = 'login') { authMode = mode; $('authTitle').textContent = { login: '账号登录', register: '注册账号', reset: '找回密码' }[mode]; $('authPasswordLabel').hidden = mode === 'login'; $('authPassword').required = mode !== 'login'; $('authSubmit').textContent = { login: '登录', register: '完成注册', reset: '重置密码' }[mode]; $('authError').textContent = ''; $('authNotice').textContent = apiBase() ? '手机号验证码登录' : '短信与账号服务暂未接通，当前可直接使用本地账本。'; $('authSubmit').disabled = !apiBase(); $('sendCode').disabled = !apiBase() || Date.now() < codeDeadline; document.querySelectorAll('[data-auth]').forEach(b => b.classList.toggle('active', b.dataset.auth === mode)); if (!$('authDialog').open) $('authDialog').showModal(); }
 function addExtraUI() {
+  const gate = (id, title) => `<div id="${id}" class="member-gate" hidden><i data-lucide="lock-keyhole"></i><h3>${title}</h3><p>会员专属 · 已购买可输入客服发放的激活码</p><button class="primary" data-open-activation><i data-lucide="key-round"></i>激活会员</button><button class="text-button" data-open-vip>查看会员方案</button></div>`;
+  const analytics = document.querySelector('.analysis-grid'); analytics.id = 'analyticsContent'; analytics.insertAdjacentHTML('afterend', gate('analyticsLocked', '盈亏曲线与错误分布'));
+  const review = $('reviewView'); const content = document.createElement('div'); content.id = 'reviewContent'; while (review.firstChild) content.appendChild(review.firstChild); review.appendChild(content); review.insertAdjacentHTML('beforeend', gate('reviewLocked', '交易错误分析'));
+  $('settingsView').insertAdjacentHTML('beforeend', '<section class="settings-section"><h2>会员激活</h2><div class="license-device"><div><span>当前设备编号</span><code data-device-code></code></div><button class="icon-button" data-copy-device title="复制设备编号" aria-label="复制设备编号"><i data-lucide="copy"></i></button></div><p class="license-hint" data-device-copy-status role="status"></p><button id="activationEntrySettings" class="secondary" data-open-activation><i data-lucide="key-round"></i>激活或续费会员</button></section>');
   $('exportCsv').insertAdjacentHTML('beforebegin', '<button class="secondary report-button" id="exportPdfBtn"><i data-lucide="file-down"></i><span>复盘报告</span></button>');
   $('tradeForm').querySelector('.form-grid').insertAdjacentHTML('afterbegin', '<label class="full">记账方式<select id="tradeMode"><option value="contract">按开平仓价计算</option><option value="manual">直接填写净盈亏</option></select></label>');
   $('tradePnl').parentElement.id = 'manualPnlLabel';
@@ -254,8 +312,16 @@ document.addEventListener('click', e => {
   if (b.dataset.edit) openTrade(b.dataset.edit);
   if (b.dataset.delete) { const t = trades.find(t => t.id === b.dataset.delete); if (t) confirmAction('删除这笔交易？', `${t.date} · ${t.symbol} · 净盈亏 ¥${money(t.pnl)}。删除后无法撤销。`, () => { saveTrades(trades.filter(x => x.id !== t.id)); render(); toast('交易已删除'); }); }
   if (b.dataset.close) $(b.dataset.close).close();
+  if (b.hasAttribute('data-open-activation')) openActivation();
+  if (b.hasAttribute('data-open-vip')) openVip();
+  if (b.hasAttribute('data-copy-device')) {
+    try {
+      loadDevice();
+      navigator.clipboard.writeText(deviceId).then(() => document.querySelectorAll('[data-device-copy-status]').forEach(el => el.textContent = '设备编号已复制，可发送给客服')).catch(() => { document.querySelectorAll('[data-device-copy-status]').forEach(el => el.textContent = '复制不可用，请选中并复制上方完整设备编号'); });
+    } catch (error) { document.querySelectorAll('[data-device-copy-status]').forEach(el => el.textContent = error.message); }
+  }
   if (b.dataset.auth) openAuth(b.dataset.auth);
-  if (b.dataset.policy) { const privacy = b.dataset.policy === 'privacy'; $('policyTitle').textContent = privacy ? '隐私说明' : '用户协议'; $('policyText').textContent = privacy ? '当前静态版的交易与笔记仅保存在本浏览器，不会主动上传到 GitHub 或其他服务器。GitHub Pages 作为托管服务可能处理网络访问日志。清除网站数据会移除账本；请定期导出备份。微信收款码和客服码由运营方提供，实际付款在微信中完成。本站不读取付款结果，也不收集付款凭证；通过微信发送给客服的信息由你自行选择。当前未接通账号服务，不会发送手机号或密码。' : '本工具用于记录与复盘，不提供交易执行或投资建议。用户应核对输入数据和计算结果，并自行备份。当前为本地账本版本，交易记录、统计和备份均可使用。微信收款采用客服人工核验，付款不会自动开通或同步本站会员状态。付款前请与客服确认会员权益、开通安排及退款规则。'; $('policyDialog').showModal(); }
+  if (b.dataset.policy) { const privacy = b.dataset.policy === 'privacy'; $('policyTitle').textContent = privacy ? '隐私说明' : '用户协议'; $('policyText').textContent = privacy ? '交易、笔记、随机生成的设备编号和已验证的激活码保存在当前浏览器，不会自动上传。GitHub Pages 可能处理访问日志。付款在微信中完成；核账时由你主动将付款凭证及设备编号发送给客服，客服在本机记录交易单号与签发信息。清除浏览器数据会移除账本及设备编号，请保留账本备份和激活码；换设备请联系客服。当前未接通在线账号服务，不发送手机号或密码。' : '本工具用于交易记录与复盘，不提供交易执行或投资建议。基础记账、统计、CSV 和数据备份免费；个人盈亏图表、错误分析与完整复盘报告为会员功能，示例账本可免费预览。月度会员 19.90 元，从激活码签发时起 30 天，续费顺延；永久会员 199 元，无固定到期日。微信付款后由客服核账并签发绑定浏览器设备编号的激活码，本站不自动确认付款。换设备、退款和服务安排请与客服确认。'; $('policyDialog').showModal(); }
 });
 $('tradeForm').onsubmit = e => { e.preventDefault(); try { const t = C.validateTrade(readForm()); const next = [...trades]; const i = next.findIndex(x => x.id === t.id); if (i >= 0) next[i] = t; else next.push(t); saveTrades(next); demo = false; $('tradeDialog').close(); render(); toast(i >= 0 ? '交易已更新' : '交易已保存到我的账本'); } catch (error) { $('tradeError').textContent = error.message; } };
 $('tradeMode').onchange = tradeMode; $('tradeDirection').onchange = tradeMode; $('contractFields').oninput = tradeMode;
@@ -273,6 +339,29 @@ $('vipSupport').onclick = () => openSupport('plans');
 $('paymentSupport').onclick = () => openSupport('payment');
 $('backToPlans').onclick = () => { $('manualPayDialog').close(); openVip(); };
 $('backFromSupport').onclick = () => { $('supportDialog').close(); if (supportReturn === 'payment') openManualPayment(manualPlan); else openVip(); };
+$('activationSupport').onclick = () => { $('activationDialog').close(); openSupport('plans'); };
+$('activationForm').onsubmit = async event => {
+  event.preventDefault(); const revision = ++licenseRevision;
+  $('activateLicense').disabled = true; $('activationError').textContent = ''; $('activationMessage').textContent = '';
+  try {
+    loadDevice(); const token = $('activationToken').value.trim();
+    const claims = await TradeLicense.verify(token, window.TRADE_LICENSE_PUBLIC_KEY, deviceId);
+    if (!TradeLicense.isActive(claims)) throw new Error(claims.issuedAt > Date.now() ? '激活码尚未生效，请核对设备时间' : '此月度激活码已到期，请联系客服续费');
+    if (!TradeLicense.isUpgrade(verifiedLicense, claims)) throw new Error('当前会员期限更长，此旧激活码不会覆盖现有会员');
+    if (revision !== licenseRevision) return;
+    localStorage.setItem(TradeLicense.TOKEN_KEY, token); verifiedLicense = claims; licenseRestoreError = '';
+    updateMembership(); render();
+    $('activationMessage').textContent = '激活成功，个人盈亏图表、错误分析与复盘报告已解锁。';
+  } catch (error) { if (revision === licenseRevision) $('activationError').textContent = error.message; }
+  finally { $('activateLicense').disabled = false; }
+};
+$('importLicense').onclick = () => $('licenseFile').click();
+$('licenseFile').onchange = async event => {
+  const file = event.target.files[0]; if (!file) return;
+  try { if (file.size > 10000) throw new Error('激活文件过大，请选择客服提供的激活文件'); $('activationToken').value = (await file.text()).trim(); $('activationForm').requestSubmit(); }
+  catch (error) { $('activationError').textContent = error.message; }
+  finally { event.target.value = ''; }
+};
 document.querySelectorAll('.pay-wechat').forEach(b => b.onclick = () => createPayOrder(b.dataset.goods, 'wx')); document.querySelectorAll('.pay-alipay').forEach(b => b.onclick = () => createPayOrder(b.dataset.goods, 'alipay'));
 $('resumePay').onclick = () => { const no = pendingOrder(); if (no) startOrderPoll(no); };
 $('accountButton').onclick = () => openAuth();
@@ -280,7 +369,10 @@ $('logoutButton').onclick = async () => { try { await request('/auth/logout', {}
 $('sendCode').onclick = async () => { if (authBusy || Date.now() < codeDeadline) return; if (!/^1[3-9]\d{9}$/.test($('authPhone').value)) { $('authError').textContent = '请输入有效的 11 位手机号'; return; } if (!$('authAgree').checked) { $('authError').textContent = '请先阅读并同意用户协议与隐私说明'; return; } authBusy = true; $('sendCode').disabled = true; try { if (!session?.csrfToken) await refreshSession(); await request('/auth/code', { phone: $('authPhone').value, purpose: authMode }); codeDeadline = Date.now() + 60000; toast('验证码已发送'); const timer = setInterval(() => { const sec = Math.ceil((codeDeadline - Date.now()) / 1000); $('sendCode').textContent = sec > 0 ? `${sec} 秒后重试` : '获取验证码'; if (sec <= 0) { clearInterval(timer); $('sendCode').disabled = false; } }, 1000); } catch (e) { $('authError').textContent = e.message; $('sendCode').disabled = false; } finally { authBusy = false; } };
 $('authForm').onsubmit = async e => { e.preventDefault(); if (authBusy) return; const password = $('authPassword').value; if (authMode !== 'login' && !/^(?=.*[A-Za-z])(?=.*\d).{8,64}$/.test(password)) { $('authError').textContent = '密码需为 8 至 64 位，包含字母和数字'; return; } authBusy = true; $('authSubmit').disabled = true; try { if (!session?.csrfToken) await refreshSession(); await request('/auth/' + authMode, { phone: $('authPhone').value, code: $('authCode').value, ...(authMode !== 'login' ? { password } : {}) }); $('authPassword').value = ''; $('authCode').value = ''; if (authMode === 'reset') { openAuth('login'); toast('密码已重置，请重新登录'); } else { await refreshSession(); $('authDialog').close(); toast('登录成功'); } } catch (error) { $('authError').textContent = error.message; } finally { authBusy = false; $('authSubmit').disabled = !apiBase(); } };
 window.addEventListener('hashchange', route);
-window.addEventListener('storage', e => { if (e.key === STORAGE_KEY || e.key === PROFILE_KEY) { load(); render(); } });
+window.addEventListener('storage', e => { if (e.key === STORAGE_KEY || e.key === PROFILE_KEY) { load(); render(); } if (e.key === TradeLicense.TOKEN_KEY || e.key === TradeLicense.DEVICE_KEY || e.key === null) restoreLicense(); });
 window.addEventListener('pagehide', stopPoll);
-route(); updateMembership();
+route(); updateMembership(); restoreLicense();
+let lastMembershipStatus = JSON.stringify(currentMembership());
+function checkExpiry() { const status = JSON.stringify(currentMembership()); if (status !== lastMembershipStatus) { lastMembershipStatus = status; $('printReport').textContent = ''; updateMembership(); render(); } }
+setInterval(checkExpiry, 15000); window.addEventListener('focus', checkExpiry);
 if (apiBase()) refreshSession().then(() => { const no = pendingOrder(); if (no && session?.user) { openVip(); startOrderPoll(no); } }).catch(() => toast('账号服务暂时不可用，本地账本仍可使用'));

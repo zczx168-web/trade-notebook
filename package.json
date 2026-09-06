@@ -5,9 +5,10 @@
   "description": "A Chinese trading journal for GitHub Pages",
   "scripts": {
     "vendor": "node scripts/vendor.cjs",
-    "test": "node --test tests/core.test.cjs",
+    "test": "node --test tests/core.test.cjs tests/license.test.cjs tests/issuer-http.test.cjs",
     "test:browser": "node tests/browser.cjs",
-    "test:payments": "node tests/payments.cjs"
+    "test:payments": "node tests/payments.cjs",
+    "test:activation": "node tests/activation.cjs"
   },
   "dependencies": {
     "chart.js": "4.5.0",

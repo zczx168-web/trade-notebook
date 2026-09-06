@@ -7,12 +7,15 @@
   <meta name="description" content="交易纠错本：记录每一笔交易，复盘交易错误，跟踪盈亏与执行纪律。">
   <title>交易纠错本 · 复盘工作台</title>
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="payments.css?v=20260906">
+  <link rel="stylesheet" href="payments.css?v=20260906-activation1">
+  <link rel="stylesheet" href="membership.css?v=20260906-activation1">
   <script defer src="vendor/lucide.js"></script>
   <script defer src="vendor/chart.umd.js"></script>
   <script defer src="config.js?v=20260906"></script>
   <script defer src="core.js"></script>
-  <script defer src="app.js?v=20260906"></script>
+  <script defer src="license-key.js?v=20260906-activation1"></script>
+  <script defer src="license-core.js?v=20260906-activation1"></script>
+  <script defer src="app.js?v=20260906-activation1"></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -60,23 +63,39 @@
       <article class="plan"><i data-lucide="calendar-days"></i><h3>月度会员</h3><div class="plan-price">¥19.90<span>/ 30 天</span></div><p>会员有效期 30 天</p><button class="pay-manual secondary" data-goods="month"><i data-lucide="qr-code"></i>微信扫码</button><button class="pay-wechat secondary" data-goods="month" hidden><i data-lucide="wallet"></i>微信在线支付</button><button class="pay-alipay secondary" data-goods="month" hidden><i data-lucide="wallet"></i>支付宝</button></article>
       <article class="plan forever"><i data-lucide="crown"></i><h3>永久会员</h3><div class="plan-price">¥199<span>/ 永久</span></div><p>会员长期有效</p><button class="pay-manual primary" data-goods="forever"><i data-lucide="qr-code"></i>微信扫码</button><button class="pay-wechat secondary" data-goods="forever" hidden><i data-lucide="wallet"></i>微信在线支付</button><button class="pay-alipay secondary" data-goods="forever" hidden><i data-lucide="wallet"></i>支付宝</button></article>
     </div>
-    <div class="membership-help"><div><p>交易记录、统计与备份当前均可使用。</p><p>付款前请向客服确认会员权益及开通安排。</p></div><button id="vipSupport" class="text-button"><i data-lucide="messages-square"></i>联系客服</button></div>
+    <div class="membership-help"><div><p>会员权益：个人盈亏图表、错误分析、完整复盘报告。</p><p>基础记账和数据备份免费，示例账本可预览会员功能。</p></div><button id="vipSupport" class="text-button"><i data-lucide="messages-square"></i>联系客服</button></div>
+    <div class="license-device"><div><span>当前设备编号</span><code data-device-code></code></div><button class="icon-button" data-copy-device title="复制设备编号" aria-label="复制设备编号"><i data-lucide="copy"></i></button></div>
+    <div class="license-entry"><span id="vipLicenseStatus">尚未激活</span><button class="secondary" data-open-activation><i data-lucide="key-round"></i>激活会员</button></div>
+    <p class="license-hint" data-device-copy-status role="status"></p>
     <div id="orderStatus" class="order-status" role="status"></div><button id="resumePay" class="secondary" hidden>查询未完成订单</button>
   </dialog>
   <dialog id="manualPayDialog" class="manual-pay-dialog" aria-labelledby="manualPayTitle">
     <div class="dialog-heading"><div><span class="eyebrow">WECHAT PAYMENT</span><h2 id="manualPayTitle">微信扫码付款</h2></div><button class="icon-button" data-close="manualPayDialog" aria-label="关闭扫码付款"><i data-lucide="x"></i></button></div>
     <div class="manual-pay-body">
       <div class="qr-column"><img id="manualPayQr" class="payment-qr" width="580" height="580" alt="会员微信收款二维码"><p class="qr-load-error" id="manualQrError" role="alert" hidden>二维码加载失败，请查看原图或稍后重试。</p><div class="qr-tools"><a id="savePaymentQr" class="secondary" download target="_blank" rel="noopener noreferrer"><i data-lucide="download"></i>保存收款码</a><a id="originalPaymentQr" class="icon-button" target="_blank" rel="noopener noreferrer" title="查看收款码原图" aria-label="查看收款码原图"><i data-lucide="maximize-2"></i></a></div></div>
-      <div class="payment-details"><span class="manual-badge"><i data-lucide="scan-line"></i>微信收款 · 人工核验</span><h3 id="manualPlanName"></h3><div class="manual-amount" id="manualAmount"></div><dl><div><dt>会员期限</dt><dd id="manualDuration"></dd></div><div><dt>收款方</dt><dd id="manualMerchant"></dd></div></dl><p class="manual-payment-note">请核对微信中的收款方和金额。付款后，将付款凭证及会员类型发送给客服核账。</p><p class="manual-status-note">本站不会自动确认到账或更新会员状态，开通安排请与客服确认。</p><button id="paymentSupport" class="primary"><i data-lucide="messages-square"></i>联系客服核账</button><button id="backToPlans" class="text-button"><i data-lucide="arrow-left"></i>返回会员中心</button></div>
+      <div class="payment-details"><span class="manual-badge"><i data-lucide="scan-line"></i>微信收款 · 人工核验</span><h3 id="manualPlanName"></h3><div class="manual-amount" id="manualAmount"></div><dl><div><dt>会员期限</dt><dd id="manualDuration"></dd></div><div><dt>收款方</dt><dd id="manualMerchant"></dd></div></dl><p class="manual-payment-note">请核对微信中的收款方和金额。付款后，将付款凭证、会员类型和设备编号发给客服。</p><p class="manual-status-note">核账后由客服发放激活码，在本站激活会员。月卡从签发时起算，续费顺延 30 天。</p><button id="paymentSupport" class="primary"><i data-lucide="messages-square"></i>联系客服核账</button><button id="backToPlans" class="text-button"><i data-lucide="arrow-left"></i>返回会员中心</button></div>
     </div>
   </dialog>
   <dialog id="supportDialog" class="support-dialog" aria-labelledby="supportTitle">
     <div class="dialog-heading"><div><span class="eyebrow">CUSTOMER SUPPORT</span><h2 id="supportTitle">客服核账</h2></div><button class="icon-button" data-close="supportDialog" aria-label="关闭客服二维码"><i data-lucide="x"></i></button></div>
     <div class="support-profile"><span class="manual-badge"><i data-lucide="messages-square"></i>微信客服</span><h3 id="supportName"></h3><p id="supportPlan"></p></div>
     <img id="supportQr" class="payment-qr" width="640" height="640" alt="焦煤观察客服微信二维码"><p class="qr-load-error" id="supportQrError" role="alert" hidden>客服二维码加载失败，请查看原图或稍后重试。</p>
-    <p class="support-note">会员权益、付款核验及开通安排，请联系此客服确认。本站未提交付款凭证，也不会自动开通会员。</p>
+    <p class="support-note">请发送付款凭证、会员类型及下方设备编号。客服核实到账后，会发放对应设备的激活码。</p>
+    <div class="license-device"><div><span>当前设备编号</span><code data-device-code></code></div><button class="icon-button" data-copy-device title="复制设备编号" aria-label="复制设备编号"><i data-lucide="copy"></i></button></div>
+    <p class="license-hint" data-device-copy-status role="status"></p>
     <div class="qr-tools"><a id="saveSupportQr" class="secondary" download target="_blank" rel="noopener noreferrer"><i data-lucide="download"></i>保存客服码</a><a id="originalSupportQr" class="icon-button" target="_blank" rel="noopener noreferrer" title="查看客服码原图" aria-label="查看客服码原图"><i data-lucide="maximize-2"></i></a></div>
     <button id="backFromSupport" class="text-button"><i data-lucide="arrow-left"></i><span>返回会员中心</span></button>
+    <button class="secondary support-activate" data-open-activation><i data-lucide="key-round"></i>已有激活码</button>
+  </dialog>
+  <dialog id="activationDialog" aria-labelledby="activationTitle">
+    <div class="dialog-heading"><div><span class="eyebrow">MEMBER ACTIVATION</span><h2 id="activationTitle">激活会员</h2></div><button class="icon-button" data-close="activationDialog" aria-label="关闭会员激活"><i data-lucide="x"></i></button></div>
+    <p id="activationStatus" class="activation-status">当前为普通版</p>
+    <div class="license-device"><div><span>当前设备编号</span><code data-device-code></code></div><button class="icon-button" data-copy-device title="复制设备编号" aria-label="复制设备编号"><i data-lucide="copy"></i></button></div>
+    <p class="license-hint" data-device-copy-status role="status"></p>
+    <form id="activationForm"><label>会员激活码<textarea id="activationToken" rows="5" maxlength="8000" placeholder="TN1. 开头的完整激活码" spellcheck="false" required></textarea></label><p id="activationError" class="form-error" role="alert"></p><div class="activation-actions"><button class="secondary" type="button" id="importLicense"><i data-lucide="upload"></i>导入激活文件</button><button class="primary" type="submit" id="activateLicense"><i data-lucide="badge-check"></i>验证并激活</button></div><input id="licenseFile" type="file" accept=".txt,.license,text/plain" hidden></form>
+    <p id="activationMessage" class="activation-message" role="status"></p>
+    <p class="license-hint">激活码绑定当前浏览器的设备编号。清理浏览器数据或更换设备后，请联系客服重新处理；请保留激活码。</p>
+    <button class="text-button" id="activationSupport"><i data-lucide="messages-square"></i>联系客服</button>
   </dialog>
   <dialog id="confirmDialog" class="confirm-dialog"><div class="dialog-heading"><h2 id="confirmTitle">确认操作</h2><button class="icon-button" data-close="confirmDialog" aria-label="关闭"><i data-lucide="x"></i></button></div><p id="confirmText"></p><div class="dialog-actions"><button class="secondary" data-close="confirmDialog">取消</button><button class="primary" id="confirmAction">确认</button></div></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
