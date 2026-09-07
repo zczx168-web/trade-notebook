@@ -115,7 +115,7 @@ function renderPerformance(list, enabled) {
   destroyPerformance();
   if (!enabled) { $('performanceTable').textContent = ''; $('performanceMetrics').textContent = ''; return; }
   const s = C.stats(list), groups = C.performance(list, $('performanceGroup').value);
-  $('performanceMetrics').innerHTML = [['盈利因子', s.factor === null ? '暂无' : s.factor === Infinity ? '无亏损样本' : s.factor.toFixed(2)], ['平均每笔净盈亏', money(s.expectancy)], ['已结束 / 持仓中', `${s.count} / ${s.openCount}`]].map(([name, value]) => `<div><span>${name}</span><b>${value}</b></div>`).join('');
+  $('performanceMetrics').innerHTML = [['盈利因子', s.factor === null ? '暂无' : s.factor === Infinity ? '无亏损样本' : s.factor.toFixed(2)], ['平均每笔净盈亏', money(s.expectancy)], ['隔夜单', `${s.overnightCount} 笔 · ${s.overnightRate.toFixed(1)}%`], ['隔夜单净盈亏', money(s.overnightPnl)], ['已结束 / 持仓中', `${s.count} / ${s.openCount}`]].map(([name, value]) => `<div><span>${name}</span><b>${value}</b></div>`).join('');
   $('performanceTable').innerHTML = groups.length ? `<div class="table-scroll"><table class="performance-table"><thead><tr><th>分组</th><th>已结束</th><th>净盈亏</th><th>胜率</th><th>平均每笔</th></tr></thead><tbody>${groups.map(g => `<tr><td>${esc(g.name)}</td><td>${g.count}</td><td class="${g.total >= 0 ? 'positive' : 'negative'}">${money(g.total)}</td><td>${g.winRate.toFixed(1)}%</td><td>${money(g.expectancy)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="performance-note">当前范围内暂无已结束交易。</p>';
   if (currentView !== 'overview' || !window.Chart) return;
   const months = C.performance(list, 'month');

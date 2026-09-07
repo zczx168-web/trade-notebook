@@ -53,7 +53,9 @@
     if (note.length > 2000) throw new Error('复盘笔记不能超过 2000 字');
     const openReason = String(t.openReason || '').trim();
     if (openReason.length > 2000) throw new Error('开仓理由不能超过 2000 字');
-    const result = { id: typeof t.id === 'string' && t.id.length > 0 && t.id.length < 100 ? t.id : crypto.randomUUID(), date: t.date, symbol, market: t.market, direction: t.direction, pnl: Math.round(Number(pnl) * 100) / 100, errors, note, openReason, mode: t.mode === 'contract' ? 'contract' : 'manual' };
+    const batchOvernight = batch ? batch.fills[0].date !== batch.fills[batch.fills.length - 1].date : false;
+    const overnight = batch ? batchOvernight : t.overnight === true;
+    const result = { id: typeof t.id === 'string' && t.id.length > 0 && t.id.length < 100 ? t.id : crypto.randomUUID(), date: t.date, symbol, market: t.market, direction: t.direction, pnl: Math.round(Number(pnl) * 100) / 100, errors, note, openReason, mode: t.mode === 'contract' ? 'contract' : 'manual', overnight };
     if (result.mode === 'contract') for (const key of ['openPrice', 'closePrice', 'volume', 'multiplier', 'fee']) result[key] = Number(t[key]);
     const strategy = String(t.strategy || '').trim();
     if (strategy.length > 40) throw new Error('策略名称不能超过 40 字');
@@ -68,6 +70,8 @@
     return trades;
   }
   function stats(trades) {
+    const overnightTrades = trades.filter(t => t.overnight === true);
+    const overnightPnl = overnightTrades.reduce((n, t) => n + Number(t.pnl || 0), 0);
     const openCount = trades.filter(t => t.mode === 'batch' && t.status === 'open').length;
     trades = trades.filter(t => !(t.mode === 'batch' && t.status === 'open'));
     let cents = 0, wins = 0, gains = 0, losses = 0, peak = 0, drawdown = 0;
@@ -92,7 +96,7 @@
       return { name, count: related.length, loss: related.reduce((n, t) => n + Math.max(0, -Math.round(t.pnl * 100)), 0) / 100 };
     }).filter(e => e.count).sort((a, b) => b.count - a.count);
     const lossCount = trades.filter(t => t.pnl < 0).length;
-    return { total: cents / 100, count: trades.length, openCount, wins, winRate: trades.length ? wins / trades.length * 100 : 0, factor: losses ? gains / losses : gains ? Infinity : null, expectancy: trades.length ? cents / 100 / trades.length : 0, averageRatio: wins && lossCount ? (gains / wins) / (losses / lossCount) : null, maxWin: Math.max(0, ...trades.map(t => t.pnl)), maxLoss: Math.min(0, ...trades.map(t => t.pnl)), drawdown: drawdown / 100, clean: trades.filter(t => t.errors.includes('无错误')).length, errors, curve };
+    return { total: cents / 100, count: trades.length, openCount, wins, winRate: trades.length ? wins / trades.length * 100 : 0, factor: losses ? gains / losses : gains ? Infinity : null, expectancy: trades.length ? cents / 100 / trades.length : 0, averageRatio: wins && lossCount ? (gains / wins) / (losses / lossCount) : null, maxWin: Math.max(0, ...trades.map(t => t.pnl)), maxLoss: Math.min(0, ...trades.map(t => t.pnl)), drawdown: drawdown / 100, clean: trades.filter(t => t.errors.includes('无错误')).length, errors, curve, overnightCount: overnightTrades.length, overnightRate: trades.length ? overnightTrades.length / trades.length * 100 : 0, overnightPnl };
   }
   function performance(trades, by = 'symbol') {
     if (!['symbol', 'strategy', 'direction', 'month'].includes(by)) throw new Error('统计分组无效');
@@ -119,7 +123,7 @@
       if (/^[=+@\-\t\r]/.test(s) && typeof value !== 'number') s = "'" + s;
       return '"' + s.replaceAll('"', '""') + '"';
     };
-    return '\uFEFF' + [['日期', '品种', '市场', '方向', '开仓价', '平仓价', '手数', '乘数', '手续费', '净盈亏', '错误标签', '开仓理由', '复盘笔记', '策略', '状态', '剩余数量', '分批成交明细'], ...trades.map(t => [t.date, t.symbol, t.market, t.direction, t.openPrice ?? '', t.closePrice ?? '', t.volume ?? '', t.multiplier ?? '', t.fee ?? '', t.pnl, t.errors.join('、'), t.openReason || '', t.note, t.strategy || '', t.status === 'open' ? '持仓中' : '已结束', t.remaining || 0, t.fills ? JSON.stringify(t.fills) : ''])].map(row => row.map(cell).join(',')).join('\r\n');
+    return '\uFEFF' + [['日期', '品种', '市场', '方向', '隔夜单', '开仓价', '平仓价', '手数', '乘数', '手续费', '净盈亏', '错误标签', '开仓理由', '复盘笔记', '策略', '状态', '剩余数量', '分批成交明细'], ...trades.map(t => [t.date, t.symbol, t.market, t.direction, t.overnight ? '是' : '否', t.openPrice ?? '', t.closePrice ?? '', t.volume ?? '', t.multiplier ?? '', t.fee ?? '', t.pnl, t.errors.join('、'), t.openReason || '', t.note, t.strategy || '', t.status === 'open' ? '持仓中' : '已结束', t.remaining || 0, t.fills ? JSON.stringify(t.fills) : ''])].map(row => row.map(cell).join(',')).join('\r\n');
   }
   const api = { ERRORS, MARKETS, calculatePnl, batches, validateTrade, validateBackup, stats, performance, filter, csv };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
